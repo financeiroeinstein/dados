@@ -6,6 +6,7 @@
 <title>BI Alunos · Einstein Palmas</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   /* ── TOKENS ───────────────────────────────────────────────────────────── */
   :root {
@@ -1489,9 +1490,11 @@
         <!-- FILTROS -->
         <div class="filter-bar">
           <span class="filter-label">Segmento:</span>
-          <button class="seg-btn active" data-rhm-seg="CONSOLIDADO" onclick="setRhmSeg(this)">Consolidado (Reg + Kids)</button>
-          <button class="seg-btn" data-rhm-seg="REGULAR" onclick="setRhmSeg(this)">Regular</button>
-          <button class="seg-btn" data-rhm-seg="KIDS"    onclick="setRhmSeg(this)">Kids</button>
+          <button class="seg-btn active" data-rhm-seg="CONSOLIDADO" onclick="setRhmSeg(this)">Consolidado</button>
+          <button class="seg-btn" data-rhm-seg="REGULAR"    onclick="setRhmSeg(this)">Regular (total)</button>
+          <button class="seg-btn" data-rhm-seg="REG_EI"     onclick="setRhmSeg(this)" style="color:#a78bfa">Regular — Ed. Infantil</button>
+          <button class="seg-btn" data-rhm-seg="REG_EF"     onclick="setRhmSeg(this)" style="color:#fb923c">Regular — Ens. Fundamental</button>
+          <button class="seg-btn" data-rhm-seg="KIDS"       onclick="setRhmSeg(this)">Kids</button>
           <span class="filter-label" style="margin-left:12px">Ano:</span>
           <select id="sel-rhm-ano" onchange="renderRecHistMensal()" style="font-size:11px">
             <option value="TODOS">Todos os anos</option>
@@ -1533,9 +1536,21 @@
 
         <!-- TABELA HISTÓRICA -->
         <div class="chart-card" style="padding:18px 20px">
-          <div class="chart-card-title" style="margin-bottom:12px">
-            Tabela Histórica Completa
-            <span style="font-size:10px;font-family:var(--font-mono);color:var(--muted);font-weight:400">mês a mês · todos os cortes</span>
+          <div class="chart-card-title" style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div>
+              Tabela Histórica Completa
+              <span style="font-size:10px;font-family:var(--font-mono);color:var(--muted);font-weight:400">mês a mês · todos os cortes</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button onclick="exportRhmXLS()" style="display:flex;align-items:center;gap:6px;padding:6px 13px;border-radius:7px;border:1px solid rgba(52,211,153,.35);background:rgba(52,211,153,.08);color:#34d399;font-family:var(--font-mono);font-size:11px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='rgba(52,211,153,.18)'" onmouseout="this.style.background='rgba(52,211,153,.08)'">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                XLS
+              </button>
+              <button onclick="exportRhmPDF()" style="display:flex;align-items:center;gap:6px;padding:6px 13px;border-radius:7px;border:1px solid rgba(251,191,36,.35);background:rgba(251,191,36,.08);color:#fbbf24;font-family:var(--font-mono);font-size:11px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='rgba(251,191,36,.18)'" onmouseout="this.style.background='rgba(251,191,36,.08)'">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                PDF
+              </button>
+            </div>
           </div>
           <div class="table-wrap">
             <table id="table-rhm">
@@ -3878,32 +3893,37 @@ renderAll = function() {
 
 <!-- ═══════════════════════════════════════════════════════════════════════
      SCRIPT: RECEITA HISTÓRICO MENSAL
-     Usa D.receitaMensal (14_Receita_Mensal) + D.inadimplenciaMensal (16)
-     — sem fetch externo, sem dependência de outro GAS
+     Usa D.receitaMensal (14) + D.inadimplenciaMensal (16) + D.receitaPorTurma (15)
+     Segmentos: CONSOLIDADO / REGULAR / REG_EI / REG_EF / KIDS
 ══════════════════════════════════════════════════════════════════════════ -->
 <script>
 (function () {
   const NOMES_MES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
   const FN = new Intl.NumberFormat('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 
-  // ── grupos por segmento ───────────────────────────────────────────────────
+  // ── mapeamento de grupos para agregação direta (aba 14) ───────────────────
   const GRUPOS = {
     REGULAR:     ['MENSALIDADE REGULAR'],
+    REG_EI:      ['MENSALIDADE REGULAR'],   // aba 16 usada diretamente para inad
+    REG_EF:      ['MENSALIDADE REGULAR'],   // aba 16 usada diretamente para inad
     KIDS:        ['MENSALIDADE KIDS'],
     CONSOLIDADO: ['MENSALIDADE REGULAR','MENSALIDADE KIDS'],
   };
 
   // ── tipo_debito na aba 16 ─────────────────────────────────────────────────
+  // REG_EI e REG_EF agora têm linhas próprias na aba 16 (separação real nos dados)
   const TIPO_INAD = {
-    REGULAR:     ['MENSALIDADES'],
+    REGULAR:     ['REG_EI','REG_EF'],
+    REG_EI:      ['REG_EI'],
+    REG_EF:      ['REG_EF'],
     KIDS:        ['KIDS'],
-    CONSOLIDADO: ['MENSALIDADES','KIDS'],
+    CONSOLIDADO: ['REG_EI','REG_EF','KIDS'],
   };
 
   let rhmSeg = 'CONSOLIDADO';
   let rhmCharts = {};
 
-  // ── helpers ───────────────────────────────────────────────────────────────
+  // ── helpers de formatação ─────────────────────────────────────────────────
   function fBRL(v) {
     if (v == null) return '—';
     const a = Math.abs(v);
@@ -3914,67 +3934,87 @@ renderAll = function() {
   function fMes(m) { const [a,mo]=String(m).split('-'); return NOMES_MES[parseInt(mo)-1]+'/'+a; }
   function r2(v) { return Math.round(v*100)/100; }
 
-  // ── dados do D global ─────────────────────────────────────────────────────
-  // receitaMensal: aba 14 — {ano_mes, ano, mes, grupo_receita, qtd_parcelas, vl_previsto, vl_recebido, vl_em_aberto, pct_recebido}
-  // inadimplenciaMensal: aba 16 — {ano_mes, ano, mes, tipo_debito, vl_previsto, vl_em_aberto_fechamento, vl_recebido_no_mes, pct_inadimplencia, pct_recebimento}
-  function getRec() { return D?.receitaMensal || []; }
+  function getRec()  { return D?.receitaMensal    || []; }
   function getInad() { return D?.inadimplenciaMensal || []; }
 
   function getMeses() {
     const ano = document.getElementById('sel-rhm-ano')?.value || 'TODOS';
     const grupos = GRUPOS[rhmSeg];
-    const rows = getRec().filter(r => grupos.includes(r.grupo_receita));
-    const all = [...new Set(rows.map(r => r.ano_mes))].sort();
+    const all = [...new Set(
+      getRec().filter(r => grupos.includes(r.grupo_receita)).map(r => r.ano_mes)
+    )].sort();
     return ano === 'TODOS' ? all : all.filter(m => String(m).startsWith(ano));
   }
 
-  // Agrega receita mensal por mes para o segmento atual
+  // ── agrega receita mensal (aba 14 para REGULAR/KIDS/CONSOLIDADO;
+  //    aba 16 para REG_EI/REG_EF — fonte única real) ───────────────────────
   function aggRecMes(mes, seg) {
-    const grupos = GRUPOS[seg || rhmSeg];
+    const s = seg || rhmSeg;
+    // REG_EI e REG_EF: usar vl_previsto/recebido/em_aberto da aba 16 (dados reais por subgrupo)
+    if (s === 'REG_EI' || s === 'REG_EF') {
+      const tipos = TIPO_INAD[s];
+      const rows = getInad().filter(r => String(r.ano_mes) === String(mes) && tipos.includes(r.tipo_debito));
+      if (!rows.length) return null;
+      const prev = rows.reduce((a,r)=>a+(r.vl_previsto||0),0);
+      const rec  = rows.reduce((a,r)=>a+(r.vl_recebido_no_mes||0),0);
+      const abr  = rows.reduce((a,r)=>a+(r.vl_em_aberto_fechamento||0),0);
+      return { previsto:r2(prev), recebido:r2(rec), emAberto:r2(abr), gap:r2(prev-rec),
+               realizacao: prev ? r2(rec/prev*100) : 0 };
+    }
+    // Demais segmentos: aba 14 (receita mensal)
+    const grupos = GRUPOS[s];
     const rows = getRec().filter(r => String(r.ano_mes) === String(mes) && grupos.includes(r.grupo_receita));
     if (!rows.length) return null;
-    const prev = rows.reduce((s,r)=>s+(r.vl_previsto||0),0);
-    const rec  = rows.reduce((s,r)=>s+(r.vl_recebido||0),0);
-    const abr  = rows.reduce((s,r)=>s+(r.vl_em_aberto||0),0);
+    const prev = rows.reduce((a,r)=>a+(r.vl_previsto||0),0);
+    const rec  = rows.reduce((a,r)=>a+(r.vl_recebido||0),0);
+    const abr  = rows.reduce((a,r)=>a+(r.vl_em_aberto||0),0);
     return { previsto:r2(prev), recebido:r2(rec), emAberto:r2(abr), gap:r2(prev-rec),
              realizacao: prev ? r2(rec/prev*100) : 0 };
   }
 
-  // inadimplência no fechamento do mês (aba 16: vl_em_aberto_fechamento / vl_previsto)
+  // ── inadimplência no fechamento (aba 16) ──────────────────────────────────
+  // REG_EI, REG_EF e KIDS têm linhas próprias na aba 16 — percentuais reais
   function inadFechamento(mes, seg) {
     const tipos = TIPO_INAD[seg || rhmSeg];
     const rows = getInad().filter(r => String(r.ano_mes) === String(mes) && tipos.includes(r.tipo_debito));
     if (!rows.length) return null;
-    const prev = rows.reduce((s,r)=>s+(r.vl_previsto||0),0);
-    const abFec= rows.reduce((s,r)=>s+(r.vl_em_aberto_fechamento||0),0);
-    return prev ? r2(abFec/prev*100) : 0;
+    const prev = rows.reduce((a,r)=>a+(r.vl_previsto||0),0);
+    const abFc = rows.reduce((a,r)=>a+(r.vl_em_aberto_fechamento||0),0);
+    return prev ? r2(abFc/prev*100) : 0;
   }
 
-  // % pago no mês de referência (recebido_no_mes / previsto) — proxy "pago no prazo" com dados disponíveis
   function pagoNoMes(mes, seg) {
     const tipos = TIPO_INAD[seg || rhmSeg];
     const rows = getInad().filter(r => String(r.ano_mes) === String(mes) && tipos.includes(r.tipo_debito));
     if (!rows.length) return null;
-    const prev = rows.reduce((s,r)=>s+(r.vl_previsto||0),0);
-    const recM = rows.reduce((s,r)=>s+(r.vl_recebido_no_mes||0),0);
+    const prev = rows.reduce((a,r)=>a+(r.vl_previsto||0),0);
+    const recM = rows.reduce((a,r)=>a+(r.vl_recebido_no_mes||0),0);
     return prev ? r2(recM/prev*100) : 0;
   }
 
-  // inadimplência hoje = vl_em_aberto (receita) / vl_previsto
+  // inadHoje = vl_em_aberto atual (aba 14) / vl_previsto
+  // Para REG_EI/EF usa aba 14 com split proporcional do vl_previsto da aba 16
   function inadHoje(mes, seg) {
-    const r = aggRecMes(mes, seg);
-    if (!r || !r.previsto) return null;
-    return r2(r.emAberto/r.previsto*100);
-  }
-
-  // inadimplência fim do ano = não existe diretamente; usamos inad hoje para meses do ano passado,
-  // e inad fechamento para o ano corrente (conservador)
-  const HOJE_ANO = new Date().getFullYear();
-  function inadFimAno(mes, seg) {
-    const anoMes = parseInt(String(mes).slice(0,4));
-    // Para anos anteriores ao atual: inad hoje ≈ posição consolidada final
-    // Para o ano corrente: usamos inad hoje (ainda em aberto)
-    return inadHoje(mes, seg);
+    const s = seg || rhmSeg;
+    if (s === 'REG_EI' || s === 'REG_EF') {
+      // Previsto real do subgrupo (aba 16)
+      const tipos = TIPO_INAD[s];
+      const rowsI = getInad().filter(r => String(r.ano_mes) === String(mes) && tipos.includes(r.tipo_debito));
+      if (!rowsI.length) return null;
+      const prevSub = rowsI.reduce((a,r)=>a+(r.vl_previsto||0),0);
+      // Previsto total REGULAR (EI+EF) para calcular proporção
+      const tiposReg = TIPO_INAD['REGULAR'];
+      const rowsReg  = getInad().filter(r => String(r.ano_mes) === String(mes) && tiposReg.includes(r.tipo_debito));
+      const prevReg  = rowsReg.reduce((a,r)=>a+(r.vl_previsto||0),0);
+      if (!prevReg) return null;
+      const fator = prevSub / prevReg;
+      // Em aberto atual da aba 14 para MENSALIDADE REGULAR × fator
+      const rowsRec = getRec().filter(r => String(r.ano_mes) === String(mes) && r.grupo_receita === 'MENSALIDADE REGULAR');
+      const abrRec  = rowsRec.reduce((a,r)=>a+(r.vl_em_aberto||0),0);
+      return prevSub ? r2(abrRec * fator / prevSub * 100) : null;
+    }
+    const r = aggRecMes(mes, s);
+    return (!r || !r.previsto) ? null : r2(r.emAberto/r.previsto*100);
   }
 
   // ── chart helper ──────────────────────────────────────────────────────────
@@ -3993,15 +4033,25 @@ renderAll = function() {
         x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6b7290',font:{family:'DM Mono',size:10},maxRotation:45,autoSkip:true,maxTicksLimit:24}},
         y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6b7290',font:{family:'DM Mono',size:10},
            callback:yPct?v=>v+'%':v=>'R$'+(v/1000).toFixed(0)+'k'},
-           ...(yPct?{min:0,max:100}:{})}
+           ...(yPct?{min:0}:{})}
       }
     };
   }
 
-  // ── render principal ──────────────────────────────────────────────────────
+  // ── label amigável por segmento ───────────────────────────────────────────
+  const SEG_LABEL = {
+    CONSOLIDADO:'Reg + Kids', REGULAR:'Regular (total)',
+    REG_EI:'Regular Ed. Infantil', REG_EF:'Regular Ens. Fundamental', KIDS:'Kids'
+  };
+
+  // ── render ────────────────────────────────────────────────────────────────
   window.renderRecHistMensal = function () {
-    if (!D) { document.getElementById('ins-fixed-rec-hist-mensal').innerHTML =
-      '<div class="insight-item" style="color:#f87171"><span class="insight-icon">⚠</span><span>Dados ainda não carregados.</span></div>'; return; }
+    if (!D) {
+      document.getElementById('ins-fixed-rec-hist-mensal').innerHTML =
+        '<div class="insight-item" style="color:#f87171"><span class="insight-icon">⚠</span><span>Dados ainda não carregados.</span></div>';
+      return;
+    }
+    // render
 
     const meses  = getMeses();
     if (!meses.length) {
@@ -4010,45 +4060,51 @@ renderAll = function() {
       document.getElementById('kpi-rec-hist-mensal').innerHTML = '';
       return;
     }
-
     const labels = meses.map(fMes);
+    const lbl = SEG_LABEL[rhmSeg] || rhmSeg;
 
-    // arrays principais
-    const aRec  = meses.map(m => aggRecMes(m));
-    const aFec  = meses.map(m => inadFechamento(m));
-    const aHoj  = meses.map(m => inadHoje(m));
-    const aFimA = meses.map(m => inadFimAno(m));
-    const aPrazo= meses.map(m => pagoNoMes(m));
+    // arrays do segmento atual
+    const aRec   = meses.map(m => aggRecMes(m));
+    const aFec   = meses.map(m => inadFechamento(m));
+    const aHoj   = meses.map(m => inadHoje(m));
+    const aPrazo = meses.map(m => pagoNoMes(m));
 
-    // arrays Regular / Kids para comparativo no Consolidado
-    const aReg  = meses.map(m => aggRecMes(m,'REGULAR'));
-    const aKid  = meses.map(m => aggRecMes(m,'KIDS'));
-    const aFecR = meses.map(m => inadFechamento(m,'REGULAR'));
-    const aFecK = meses.map(m => inadFechamento(m,'KIDS'));
-    const aPrazR= meses.map(m => pagoNoMes(m,'REGULAR'));
-    const aPrazK= meses.map(m => pagoNoMes(m,'KIDS'));
+    // arrays auxiliares para gráficos comparativos por modo
+    const aEI    = meses.map(m => aggRecMes(m,'REG_EI'));
+    const aEF    = meses.map(m => aggRecMes(m,'REG_EF'));
+    const aReg   = meses.map(m => aggRecMes(m,'REGULAR'));
+    const aKid   = meses.map(m => aggRecMes(m,'KIDS'));
+    const aPrazR = meses.map(m => pagoNoMes(m,'REGULAR'));
+    const aPrazK = meses.map(m => pagoNoMes(m,'KIDS'));
 
-    const g = (arr, fn, d=null) => arr.map(r => r != null ? fn(r) : d);
-    const gv= (arr, fn, d=0)   => arr.map(r => r != null ? fn(r) : d);
+    const g  = (arr, fn, d=null) => arr.map(r => r != null ? fn(r) : d);
+    const gv = (arr, fn, d=0)   => arr.map(r => r != null ? fn(r) : d);
 
     // ── KPIs ────────────────────────────────────────────────────────────────
     let tP=0,tR=0,tA=0,tG=0,sRl=0,sF=0,sH=0,sP=0,c=0;
     aRec.forEach(r=>{ if(!r)return; tP+=r.previsto;tR+=r.recebido;tA+=r.emAberto;tG+=r.gap;sRl+=r.realizacao;c++; });
-    aFec.forEach(v=>{ if(v!=null)sF+=v; });
-    aHoj.forEach(v=>{ if(v!=null)sH+=v; });
-    aPrazo.forEach(v=>{ if(v!=null)sP+=v; });
+    aFec.forEach(v=>{ if(v!=null) sF+=v; });
+    aHoj.forEach(v=>{ if(v!=null) sH+=v; });
+    aPrazo.forEach(v=>{ if(v!=null) sP+=v; });
     const av = v => c ? r2(v/c) : 0;
-    const lbl = {CONSOLIDADO:'Reg + Kids',REGULAR:'Regular',KIDS:'Kids'}[rhmSeg];
+
+    // badge de nota para EI/EF (dados estimados por split proporcional)
+    const noteEIEF = (rhmSeg==='REG_EI'||rhmSeg==='REG_EF')
+      ? ' <span style="font-size:9px;color:#a78bfa;font-family:var(--font-mono)">★ estimado via split anual da aba 15</span>' : '';
 
     document.getElementById('kpi-rec-hist-mensal').innerHTML = [
-      {label:'Previsto Total',       value:fBRL(tP),      color:'#4f7cff', sub:`${c} meses · ${lbl}`},
-      {label:'Recebido Total',       value:fBRL(tR),      color:'#34d399', sub:'acumulado'},
-      {label:'Em Aberto',            value:fBRL(tA),      color:tA>0?'#fbbf24':'#34d399', sub:'posição atual'},
-      {label:'% Realização (méd)',   value:fPct(av(sRl)), color:av(sRl)>=95?'#34d399':av(sRl)>=85?'#fbbf24':'#f87171', sub:'meta 100%'},
-      {label:'% Pago no Mês (méd)', value:fPct(av(sP)),  color:av(sP)>=80?'#34d399':'#fbbf24', sub:'recebido no próprio mês'},
-      {label:'% Inad Fec (méd)',     value:fPct(av(sF)),  color:av(sF)<=3?'#34d399':av(sF)<=8?'#fbbf24':'#f87171', sub:'último dia mês'},
-      {label:'% Inad Hoje (méd)',    value:fPct(av(sH)),  color:av(sH)<=3?'#34d399':av(sH)<=8?'#fbbf24':'#f87171', sub:'posição atual'},
-    ].map(k=>`<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-value" style="font-size:20px;color:${k.color}">${k.value}</div><div class="kpi-delta neu">${k.sub}</div></div>`).join('');
+      {label:'Previsto Total',      value:fBRL(tP),      color:'#4f7cff', sub:`${c} meses · ${lbl}`},
+      {label:'Recebido Total',      value:fBRL(tR),      color:'#34d399', sub:'acumulado'},
+      {label:'Em Aberto',           value:fBRL(tA),      color:tA>0?'#fbbf24':'#34d399', sub:'posição atual'},
+      {label:'% Realização (méd)',  value:fPct(av(sRl)), color:av(sRl)>=95?'#34d399':av(sRl)>=85?'#fbbf24':'#f87171', sub:'meta 100%'},
+      {label:'% Pago no Mês (méd)',value:fPct(av(sP)),  color:av(sP)>=80?'#34d399':'#fbbf24', sub:'recebido no próprio mês'},
+      {label:'% Inad Fec (méd)',    value:fPct(av(sF)),  color:av(sF)<=3?'#34d399':av(sF)<=8?'#fbbf24':'#f87171', sub:'último dia mês'},
+      {label:'% Inad Hoje (méd)',   value:fPct(av(sH)),  color:av(sH)<=3?'#34d399':av(sH)<=8?'#fbbf24':'#f87171', sub:'posição atual'},
+    ].map(k=>`<div class="kpi-card">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value" style="font-size:20px;color:${k.color}">${k.value}${noteEIEF&&k.label==='Previsto Total'?noteEIEF:''}</div>
+      <div class="kpi-delta neu">${k.sub}</div>
+    </div>`).join('');
 
     // ── CHART 1: Previsto × Recebido ────────────────────────────────────────
     if (rhmSeg === 'CONSOLIDADO') {
@@ -4058,9 +4114,19 @@ renderAll = function() {
         {label:'Kids — Previsto',   data:gv(aKid,r=>r.previsto), backgroundColor:'rgba(34,211,238,.5)',  borderColor:'#22d3ee',borderWidth:1,borderRadius:3},
         {label:'Kids — Recebido',   data:gv(aKid,r=>r.recebido), backgroundColor:'rgba(34,211,238,.22)', borderColor:'#22d3ee',borderWidth:1,borderRadius:3},
       ]},options:bOpts()});
-    } else {
+    } else if (rhmSeg === 'REGULAR') {
+      // Regular total: mostrar EI e EF lado a lado
       rhmMk('chart-rhm-prevrec',{type:'bar',data:{labels,datasets:[
-        {label:'Previsto',  data:gv(aRec,r=>r.previsto), backgroundColor:'rgba(79,124,255,.45)',borderColor:'#4f7cff',borderWidth:1,borderRadius:3},
+        {label:'EI — Previsto',  data:gv(aEI,r=>r.previsto), backgroundColor:'rgba(167,139,250,.5)',  borderColor:'#a78bfa',borderWidth:1,borderRadius:3},
+        {label:'EI — Recebido', data:gv(aEI,r=>r.recebido), backgroundColor:'rgba(167,139,250,.22)', borderColor:'#a78bfa',borderWidth:1,borderRadius:3},
+        {label:'EF — Previsto',  data:gv(aEF,r=>r.previsto), backgroundColor:'rgba(251,146,60,.5)',   borderColor:'#fb923c',borderWidth:1,borderRadius:3},
+        {label:'EF — Recebido', data:gv(aEF,r=>r.recebido), backgroundColor:'rgba(251,146,60,.22)',  borderColor:'#fb923c',borderWidth:1,borderRadius:3},
+      ]},options:bOpts()});
+    } else {
+      // REG_EI, REG_EF, KIDS: Previsto / Recebido / Em Aberto simples
+      const cor = rhmSeg==='REG_EI'?'#a78bfa':rhmSeg==='REG_EF'?'#fb923c':rhmSeg==='KIDS'?'#22d3ee':'#4f7cff';
+      rhmMk('chart-rhm-prevrec',{type:'bar',data:{labels,datasets:[
+        {label:'Previsto',  data:gv(aRec,r=>r.previsto), backgroundColor:`rgba(${cor.slice(1).match(/../g).map(x=>parseInt(x,16)).join(',')}, .45)`,borderColor:cor,borderWidth:1,borderRadius:3},
         {label:'Recebido',  data:gv(aRec,r=>r.recebido), backgroundColor:'rgba(52,211,153,.45)',borderColor:'#34d399',borderWidth:1,borderRadius:3},
         {label:'Em Aberto', data:gv(aRec,r=>r.emAberto), backgroundColor:'rgba(251,191,36,.35)', borderColor:'#fbbf24',borderWidth:1,borderRadius:3},
       ]},options:bOpts()});
@@ -4073,6 +4139,12 @@ renderAll = function() {
         {label:'% Kids',    data:g(aKid,r=>r.realizacao), borderColor:'#22d3ee',backgroundColor:'rgba(34,211,238,.07)',fill:true,tension:.3,pointRadius:3,borderWidth:2},
         {label:'Meta 95%',  data:meses.map(()=>95), borderColor:'rgba(251,191,36,.4)',borderDash:[4,3],pointRadius:0,borderWidth:1.5,fill:false},
       ]},options:bOpts(true)});
+    } else if (rhmSeg === 'REGULAR') {
+      rhmMk('chart-rhm-realizacao',{type:'line',data:{labels,datasets:[
+        {label:'% EI',     data:g(aEI,r=>r.realizacao), borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,.08)',fill:true,tension:.3,pointRadius:3,borderWidth:2},
+        {label:'% EF',     data:g(aEF,r=>r.realizacao), borderColor:'#fb923c',backgroundColor:'rgba(251,146,60,.07)',fill:true,tension:.3,pointRadius:3,borderWidth:2},
+        {label:'Meta 95%', data:meses.map(()=>95), borderColor:'rgba(251,191,36,.4)',borderDash:[4,3],pointRadius:0,borderWidth:1.5,fill:false},
+      ]},options:bOpts(true)});
     } else {
       rhmMk('chart-rhm-realizacao',{type:'line',data:{labels,datasets:[
         {label:'% Realizado',data:g(aRec,r=>r.realizacao),borderColor:'#34d399',backgroundColor:'rgba(52,211,153,.1)',fill:true,tension:.3,pointRadius:3,borderWidth:2},
@@ -4080,20 +4152,18 @@ renderAll = function() {
       ]},options:bOpts(true)});
     }
 
-    // ── CHART 3: dois cortes (Fechamento + Hoje) ─────────────────────────────
-    // Nota: "Fim do Ano" não existe como campo direto — usamos "Hoje" como aproximação
-    // para anos anteriores (posição já consolidada) e "Fechamento" para o mês corrente
+    // ── CHART 3: dois cortes ─────────────────────────────────────────────────
     rhmMk('chart-rhm-tresCortes',{type:'line',data:{labels,datasets:[
-      {label:'Inad. no Fechamento (último dia mês)', data:aFec,  borderColor:'#fbbf24',backgroundColor:'rgba(251,191,36,.07)',fill:true,tension:.3,pointRadius:3,borderWidth:2},
-      {label:'Inad. Hoje (posição atual)',            data:aHoj,  borderColor:'#34d399',backgroundColor:'rgba(52,211,153,.07)',fill:true,tension:.3,pointRadius:3,borderWidth:2},
+      {label:'Inad. no Fechamento',data:aFec, borderColor:'#fbbf24',backgroundColor:'rgba(251,191,36,.07)',fill:true,tension:.3,pointRadius:3,borderWidth:2},
+      {label:'Inad. Hoje',         data:aHoj, borderColor:'#34d399',backgroundColor:'rgba(52,211,153,.07)',fill:true,tension:.3,pointRadius:3,borderWidth:2},
     ]},options:bOpts(true)});
 
     // ── CHART 4: % pago no mês ───────────────────────────────────────────────
     if (rhmSeg === 'CONSOLIDADO') {
       rhmMk('chart-rhm-prazo',{type:'line',data:{labels,datasets:[
-        {label:'% Pago no Mês — Regular',data:aPrazR,borderColor:'#4f7cff',backgroundColor:'transparent',tension:.3,pointRadius:3,borderWidth:2},
-        {label:'% Pago no Mês — Kids',   data:aPrazK,borderColor:'#22d3ee',backgroundColor:'transparent',borderDash:[4,2],tension:.3,pointRadius:3,borderWidth:2},
-        {label:'Meta 80%',data:meses.map(()=>80),borderColor:'rgba(251,191,36,.4)',borderDash:[4,3],pointRadius:0,borderWidth:1.5,fill:false},
+        {label:'% Regular',data:aPrazR,borderColor:'#4f7cff',backgroundColor:'transparent',tension:.3,pointRadius:3,borderWidth:2},
+        {label:'% Kids',   data:aPrazK,borderColor:'#22d3ee',backgroundColor:'transparent',borderDash:[4,2],tension:.3,pointRadius:3,borderWidth:2},
+        {label:'Meta 80%', data:meses.map(()=>80),borderColor:'rgba(251,191,36,.4)',borderDash:[4,3],pointRadius:0,borderWidth:1.5,fill:false},
       ]},options:bOpts(true)});
     } else {
       rhmMk('chart-rhm-prazo',{type:'line',data:{labels,datasets:[
@@ -4102,22 +4172,23 @@ renderAll = function() {
       ]},options:bOpts(true)});
     }
 
-    // ── CHART 5: recuperação Fec → Hoje ─────────────────────────────────────
-    const recD = meses.map((m,i)=>{
-      const f=aFec[i], h=aHoj[i];
-      return (f!=null&&h!=null) ? r2(f-h) : null;
+    // ── CHART 5: recuperação ─────────────────────────────────────────────────
+    const recD = meses.map((_,i)=>{
+      const f=aFec[i],h=aHoj[i];
+      return (f!=null&&h!=null)?r2(f-h):null;
     });
     rhmMk('chart-rhm-recuperacao',{type:'bar',data:{labels,datasets:[
       {label:'Δ Fec→Hoje (pp)',data:recD,
        backgroundColor:recD.map(v=>v==null?'rgba(107,114,128,.2)':v>=0?'rgba(52,211,153,.5)':'rgba(248,113,113,.4)'),
-       borderColor:recD.map(v=>v==null?'#6b7280':v>=0?'#34d399':'#f87171'),
-       borderWidth:1,borderRadius:3},
+       borderColor:recD.map(v=>v==null?'#6b7280':v>=0?'#34d399':'#f87171'),borderWidth:1,borderRadius:3},
     ]},options:{...bOpts(),scales:{...bOpts().scales,y:{...bOpts().scales.y,ticks:{...bOpts().scales.y.ticks,callback:v=>v+'pp'}}}}});
 
     // ── TABELA ───────────────────────────────────────────────────────────────
-    const extraTh = rhmSeg==='CONSOLIDADO'
-      ? '<th style="text-align:right;color:#4f7cff">Prev. Regular</th><th style="text-align:right;color:#22d3ee">Prev. Kids</th>'
-      : '';
+    // Colunas extras: no Consolidado → Reg/Kids; no Regular → EI/EF
+    let extraTh = '';
+    if (rhmSeg==='CONSOLIDADO') extraTh = '<th style="text-align:right;color:#4f7cff">Reg Previsto</th><th style="text-align:right;color:#22d3ee">Kids Previsto</th>';
+    if (rhmSeg==='REGULAR')     extraTh = '<th style="text-align:right;color:#a78bfa">EI Previsto</th><th style="text-align:right;color:#fb923c">EF Previsto</th>';
+
     document.querySelector('#table-rhm thead tr').innerHTML =
       `<th style="text-align:left;min-width:70px">Mês</th>
        <th style="text-align:right">Previsto</th>${extraTh}
@@ -4134,16 +4205,14 @@ renderAll = function() {
       if(ano!==anoAt){ anoAt=ano; rows+=`<tr style="background:rgba(79,124,255,.06)"><td colspan="99" style="padding:5px 14px;font-family:var(--font-mono);font-size:10px;color:var(--accent);letter-spacing:.08em">◆ ${ano}</td></tr>`; }
       if(!r){ rows+=`<tr><td class="td-mono">${fMes(m)}</td><td colspan="99" style="text-align:center;color:var(--muted);font-size:11px">sem dados</td></tr>`; return; }
       _tP+=r.previsto;_tR+=r.recebido;_tA+=r.emAberto;_tG+=r.gap;_sRl+=r.realizacao;_c++;
-      if(aFec[i]!=null) _sF+=aFec[i];
-      if(aHoj[i]!=null) _sH+=aHoj[i];
-      if(aPrazo[i]!=null) _sP+=aPrazo[i];
+      if(aFec[i]!=null) _sF+=aFec[i]; if(aHoj[i]!=null) _sH+=aHoj[i]; if(aPrazo[i]!=null) _sP+=aPrazo[i];
       const clR=r.realizacao>=95?'#34d399':r.realizacao>=85?'#fbbf24':'#f87171';
       const f=aFec[i],h=aHoj[i],delta=recD[i];
       const clF=f==null?'var(--muted)':f<=3?'#34d399':f<=8?'#fbbf24':'#f87171';
       const clH=h==null?'var(--muted)':h<=3?'#34d399':h<=8?'#fbbf24':'#f87171';
-      const extTd = rhmSeg==='CONSOLIDADO'
-        ? `<td class="td-mono td-right" style="color:#4f7cff">${aReg[i]?fBRL(aReg[i].previsto):'—'}</td><td class="td-mono td-right" style="color:#22d3ee">${aKid[i]?fBRL(aKid[i].previsto):'—'}</td>`
-        : '';
+      let extTd = '';
+      if(rhmSeg==='CONSOLIDADO') extTd=`<td class="td-mono td-right" style="color:#4f7cff">${aReg[i]?fBRL(aReg[i].previsto):'—'}</td><td class="td-mono td-right" style="color:#22d3ee">${aKid[i]?fBRL(aKid[i].previsto):'—'}</td>`;
+      if(rhmSeg==='REGULAR')     extTd=`<td class="td-mono td-right" style="color:#a78bfa">${aEI[i]?fBRL(aEI[i].previsto):'—'}</td><td class="td-mono td-right" style="color:#fb923c">${aEF[i]?fBRL(aEF[i].previsto):'—'}</td>`;
       rows+=`<tr>
         <td class="td-mono">${fMes(m)}</td>
         <td class="td-mono td-right" style="color:#4f7cff">${fBRL(r.previsto)}</td>${extTd}
@@ -4159,10 +4228,10 @@ renderAll = function() {
     });
     document.getElementById('tbody-rhm').innerHTML = rows;
 
-    const av2 = v=>_c?r2(v/_c):0;
-    const extFoot = rhmSeg==='CONSOLIDADO'
-      ? `<td class="td-mono td-right" style="color:#4f7cff">${fBRL(aReg.reduce((s,r)=>s+(r?.previsto||0),0))}</td><td class="td-mono td-right" style="color:#22d3ee">${fBRL(aKid.reduce((s,r)=>s+(r?.previsto||0),0))}</td>`
-      : '';
+    const av2=v=>_c?r2(v/_c):0;
+    let extFoot='';
+    if(rhmSeg==='CONSOLIDADO') extFoot=`<td class="td-mono td-right" style="color:#4f7cff">${fBRL(aReg.reduce((s,r)=>s+(r?.previsto||0),0))}</td><td class="td-mono td-right" style="color:#22d3ee">${fBRL(aKid.reduce((s,r)=>s+(r?.previsto||0),0))}</td>`;
+    if(rhmSeg==='REGULAR')     extFoot=`<td class="td-mono td-right" style="color:#a78bfa">${fBRL(aEI.reduce((s,r)=>s+(r?.previsto||0),0))}</td><td class="td-mono td-right" style="color:#fb923c">${fBRL(aEF.reduce((s,r)=>s+(r?.previsto||0),0))}</td>`;
     document.getElementById('tfoot-rhm').innerHTML = `<tr style="background:var(--surface)">
       <td class="td-mono" style="font-weight:700">Total / Média (${_c} meses)</td>
       <td class="td-mono td-right" style="color:#4f7cff;font-weight:700">${fBRL(_tP)}</td>${extFoot}
@@ -4187,12 +4256,141 @@ renderAll = function() {
         {icon:'💡',text:`Gap total: ${fBRL(_tG)} — diferença entre emitido e recebido no período (${lbl}).`},
       ].map(i=>`<div class="insight-item"><span class="insight-icon">${i.icon}</span><span>${i.text}</span></div>`).join('');
     }
-
     document.getElementById('rhm-status').textContent =
       'atualizado ' + new Date(D.geradoEm||Date.now()).toLocaleDateString('pt-BR');
   };
 
-  // ── filtro segmento ───────────────────────────────────────────────────────
+  // ── EXPORTAÇÃO XLS (SheetJS — .xlsx real) ────────────────────────────────
+  window.exportRhmXLS = function() {
+    if (typeof XLSX === 'undefined') {
+      alert('Biblioteca de exportação ainda carregando. Aguarde alguns segundos e tente novamente.');
+      return;
+    }
+    const table = document.getElementById('table-rhm');
+    if (!table) return;
+
+    const SEG_LABEL_EXP = {
+      CONSOLIDADO:'Consolidado', REGULAR:'Regular (total)',
+      REG_EI:'Regular - Ed. Infantil', REG_EF:'Regular - Ens. Fundamental', KIDS:'Kids'
+    };
+    const ano     = document.getElementById('sel-rhm-ano')?.value || 'TODOS';
+    const segNome = SEG_LABEL_EXP[rhmSeg] || rhmSeg;
+    const nomeArq = `Historico_Mensal_${segNome.replace(/[^a-zA-Z0-9_-]/g,'_')}_${ano}.xlsx`;
+
+    // ── Coletar dados da tabela ──────────────────────────────────────────────
+    const heads = [...table.querySelectorAll('thead tr th')].map(th => th.innerText.trim());
+
+    const dataRows = [];
+    table.querySelectorAll('tbody tr').forEach(tr => {
+      const tds = tr.querySelectorAll('td');
+      if (tds.length <= 2) return; // separador de ano
+      dataRows.push([...tds].map(td => td.innerText.trim()));
+    });
+
+    const footRow = [];
+    const footTr = table.querySelector('tfoot tr');
+    if (footTr) footRow.push([...footTr.querySelectorAll('td')].map(td => td.innerText.trim()));
+
+    // ── Montar array de arrays para SheetJS ──────────────────────────────────
+    const sheetData = [
+      [`Histórico Mensal — ${segNome} | Ano: ${ano}`],
+      [`Colégio Einstein Palmas · Gerado em ${new Date().toLocaleString('pt-BR')}`],
+      [],
+      heads,
+      ...dataRows,
+      [],
+      ...(footRow.length ? footRow : [])
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+    // ── Estilos básicos: largura das colunas ─────────────────────────────────
+    const colWidths = heads.map((h, i) => {
+      if (i === 0) return { wch: 12 };   // Mês
+      return { wch: 16 };                 // demais
+    });
+    ws['!cols'] = colWidths;
+
+    // Mesclar célula do título (linha 1)
+    ws['!merges'] = [
+      { s:{r:0,c:0}, e:{r:0,c:heads.length-1} },
+      { s:{r:1,c:0}, e:{r:1,c:heads.length-1} },
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Histórico Mensal');
+    XLSX.writeFile(wb, nomeArq);
+  };
+
+  // ── EXPORTAÇÃO PDF ────────────────────────────────────────────────────────
+  window.exportRhmPDF = function() {
+    const table = document.getElementById('table-rhm');
+    if (!table) return;
+
+    const SEG_LABEL_EXP = {
+      CONSOLIDADO:'Consolidado', REGULAR:'Regular (total)',
+      REG_EI:'Regular — Ed. Infantil', REG_EF:'Regular — Ens. Fundamental', KIDS:'Kids'
+    };
+    const ano    = document.getElementById('sel-rhm-ano')?.value || 'TODOS';
+    const titulo = `Histórico Mensal — ${SEG_LABEL_EXP[rhmSeg]||rhmSeg} | Ano: ${ano}`;
+
+    // Clonar tabela para limpeza visual
+    const clone = table.cloneNode(true);
+    // Remover atributos de cor inline nas células para garantir legibilidade no PDF
+    clone.querySelectorAll('th,td').forEach(el => { el.style.color = ''; el.style.fontWeight = ''; });
+
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>${titulo}</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; color: #1a1a2e; padding: 24px; }
+  h2 { font-size:14px; color:#1a237e; margin-bottom:4px; }
+  p.sub { font-size:9px; color:#666; margin-bottom:16px; }
+  table { width:100%; border-collapse:collapse; }
+  thead th {
+    background:#1a237e; color:#fff; padding:6px 8px;
+    font-size:9px; text-align:right; white-space:nowrap;
+    border:1px solid #1a237e;
+  }
+  thead th:first-child { text-align:left; }
+  tbody tr:nth-child(even) { background:#f0f4ff; }
+  tbody tr:nth-child(odd)  { background:#ffffff; }
+  tbody td {
+    padding:5px 8px; border:1px solid #dde2f0;
+    font-size:9px; text-align:right; white-space:nowrap;
+    font-family:'Courier New',monospace; color:#1a1a2e;
+  }
+  tbody td:first-child { text-align:left; font-family:'Segoe UI',Arial,sans-serif; }
+  tfoot td {
+    background:#e8f5e9; font-weight:700; padding:6px 8px;
+    border:1px solid #a5d6a7; font-size:9px; text-align:right; white-space:nowrap;
+    font-family:'Courier New',monospace; color:#1b5e20;
+  }
+  tfoot td:first-child { text-align:left; font-family:'Segoe UI',Arial,sans-serif; }
+  .sep-row td { background:#e8eaf0 !important; font-family:'Segoe UI',Arial,sans-serif !important;
+    font-size:9px; color:#3949ab; font-weight:600; letter-spacing:.06em; padding:4px 8px; }
+  @page { size: A4 landscape; margin: 15mm 12mm; }
+  @media print {
+    body { padding:0; }
+    button { display:none; }
+  }
+</style>
+</head><body>
+<h2>${titulo}</h2>
+<p class="sub">Gerado em ${new Date().toLocaleString('pt-BR')} · Colégio Einstein Palmas</p>
+${clone.outerHTML}
+<br>
+<div style="text-align:right;margin-top:12px">
+  <button onclick="window.print()" style="padding:8px 20px;background:#1a237e;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">🖨 Imprimir / Salvar PDF</button>
+  <button onclick="window.close()" style="padding:8px 16px;background:#eee;color:#333;border:none;border-radius:6px;font-size:12px;cursor:pointer;margin-left:8px">Fechar</button>
+</div>
+</body></html>`);
+    win.document.close();
+    win.focus();
+  };
+
+
   window.setRhmSeg = function(btn) {
     document.querySelectorAll('[data-rhm-seg]').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
@@ -4200,7 +4398,7 @@ renderAll = function() {
     renderRecHistMensal();
   };
 
-  // ── setup do select de ano ─────────────────────────────────────────────────
+  // ── setup do select de ano ────────────────────────────────────────────────
   function setupRhmAno() {
     const rows = getRec();
     if (!rows.length) return;
