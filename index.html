@@ -552,6 +552,45 @@
     color: var(--muted);
     white-space: nowrap;
   }
+
+  .nav-item.nav-external { text-decoration: none; color: var(--muted); }
+  .nav-item.nav-external:hover { color: var(--text); background: rgba(79,124,255,.06); }
+  .quick-link-card {
+    cursor: pointer;
+    transition: transform .15s ease, border-color .15s ease, background .15s ease;
+    background: linear-gradient(135deg, rgba(79,124,255,.10) 0%, rgba(34,211,238,.05) 100%);
+  }
+  .quick-link-card:hover {
+    transform: translateY(-1px);
+    border-color: var(--accent);
+    background: linear-gradient(135deg, rgba(79,124,255,.16) 0%, rgba(34,211,238,.08) 100%);
+  }
+  .quick-link-card .quick-link-title {
+    font-family: var(--font-head);
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .quick-link-card .quick-link-desc {
+    color: #c8cde0;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .quick-link-card .quick-link-badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent);
+    border: 1px solid rgba(79,124,255,.35);
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
 </style>
 </head>
 <body>
@@ -634,25 +673,10 @@
     <div class="nav-item" data-view="rec-eventos">
       <span class="nav-icon">🎫</span> Taxas e Eventos
     </div>
-    <div class="nav-item" data-view="rec-hist-mensal">
-      <span class="nav-icon">📈</span> Histórico Mensal
-    </div>
-    <div class="nav-section">Inadimplência</div>
-    <div class="nav-item" data-view="inad-visao-geral">
-      <span class="nav-icon">⚠</span> Visão Geral
-    </div>
-    <div class="nav-item" data-view="inad-mensal">
-      <span class="nav-icon">📆</span> Fechamento Mensal
-    </div>
-    <div class="nav-item" data-view="inad-turma">
-      <span class="nav-icon">🏛</span> Por Turma
-    </div>
-    <div class="nav-item" data-view="inad-aluno">
-      <span class="nav-icon">👤</span> Por Aluno
-    </div>
-    <div class="nav-item" data-view="inad-concentracao">
-      <span class="nav-icon">🎯</span> Concentração
-    </div>
+    <div class="nav-section">Financeiro</div>
+    <a class="nav-item nav-external" href="bi_historico_mensal.html" target="_blank" rel="noopener">
+      <span class="nav-icon">📊</span> BI Histórico Mensal
+    </a>
 
   </nav>
 
@@ -698,6 +722,16 @@
 
         <!-- KPI strip -->
         <div class="kpi-grid" id="kpi-overview"></div>
+
+        <div class="chart-card quick-link-card" onclick="abrirHistoricoMensal()" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){abrirHistoricoMensal();}">
+          <div class="quick-link-title">
+            <span>📊 BI Histórico Mensal</span>
+            <span class="quick-link-badge">abrir painel financeiro</span>
+          </div>
+          <div class="quick-link-desc">
+            Acesse a página financeira separada com histórico mensal de receita, inadimplência, recuperação, recebimento no mês e visão acumulada do ano.
+          </div>
+        </div>
 
         <div class="grid-2">
           <div class="chart-card">
@@ -1492,8 +1526,8 @@
           <span class="filter-label">Segmento:</span>
           <button class="seg-btn active" data-rhm-seg="CONSOLIDADO" onclick="setRhmSeg(this)">Consolidado</button>
           <button class="seg-btn" data-rhm-seg="REGULAR"    onclick="setRhmSeg(this)">Regular (total)</button>
-          <button class="seg-btn" data-rhm-seg="REG_EI"     onclick="setRhmSeg(this)" style="color:#a78bfa">Regular — Ed. Infantil</button>
-          <button class="seg-btn" data-rhm-seg="REG_EF"     onclick="setRhmSeg(this)" style="color:#fb923c">Regular — Ens. Fundamental</button>
+          <button class="seg-btn" data-rhm-seg="REG_EI"     onclick="setRhmSeg(this)" style="color:#a78bfa;opacity:.4" title="Sem split EI/EF nos dados — exibe Regular total">Regular — Ed. Infantil ★</button>
+          <button class="seg-btn" data-rhm-seg="REG_EF"     onclick="setRhmSeg(this)" style="color:#fb923c;opacity:.4" title="Sem split EI/EF nos dados — exibe Regular total">Regular — Ens. Fundamental ★</button>
           <button class="seg-btn" data-rhm-seg="KIDS"       onclick="setRhmSeg(this)">Kids</button>
           <span class="filter-label" style="margin-left:12px">Ano:</span>
           <select id="sel-rhm-ano" onchange="renderRecHistMensal()" style="font-size:11px">
@@ -1930,14 +1964,26 @@ function renderAll() {
 // ═════════════════════════════════════════════════════════════════════════════
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', () => {
+    const view = item.dataset.view;
+    if (!view) return; // links externos, como BI Histórico Mensal
     document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     item.classList.add('active');
-    const view = item.dataset.view;
-    document.getElementById('view-' + view).classList.add('active');
-    document.getElementById('view-title').textContent = VIEW_TITLES[view];
+    const target = document.getElementById('view-' + view);
+    if (!target) return;
+    target.classList.add('active');
+    document.getElementById('view-title').textContent = VIEW_TITLES[view] || 'BI Alunos Histórico';
   });
 });
+
+function abrirHistoricoMensal() {
+  const url = 'bi_historico_mensal.html';
+  if (window.location.protocol === 'file:') {
+    window.location.href = url;
+    return;
+  }
+  window.open(url, '_blank', 'noopener');
+}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -3120,7 +3166,7 @@ function renderInadMensal(){
 
   // Agrupar por ano_mes
   const m={};
-  rows.forEach(r=>{ if(!m[r.ano_mes]) m[r.ano_mes]={vp:0,va:0,vr:0}; m[r.ano_mes].vp+=r.vl_previsto||0; m[r.ano_mes].va+=r.vl_em_aberto_fechamento||0; m[r.ano_mes].vr+=r.vl_recebido_no_mes||0; });
+  rows.forEach(r=>{ if(!m[r.ano_mes]) m[r.ano_mes]={vp:0,va:0,vr:0}; m[r.ano_mes].vp+=r.vl_previsto||0; m[r.ano_mes].va+=r.vl_em_aberto_fechamento||0; m[r.ano_mes].vr+=r.vl_rec_no_mes||0; });
   const labels=Object.keys(m).sort();
   const pcts=labels.map(l=>m[l].vp?Math.round(m[l].va/m[l].vp*1000)/10:0);
 
@@ -3911,13 +3957,13 @@ renderAll = function() {
   };
 
   // ── tipo_debito na aba 16 ─────────────────────────────────────────────────
-  // REG_EI e REG_EF agora têm linhas próprias na aba 16 (separação real nos dados)
+  // Dados consolidados por REGULAR (EI+EF juntos) e KIDS
   const TIPO_INAD = {
-    REGULAR:     ['REG_EI','REG_EF'],
-    REG_EI:      ['REG_EI'],
-    REG_EF:      ['REG_EF'],
+    REGULAR:     ['REGULAR'],
+    REG_EI:      ['REGULAR'],   // sem split EI/EF nos dados — usa REGULAR completo
+    REG_EF:      ['REGULAR'],   // sem split EI/EF nos dados — usa REGULAR completo
     KIDS:        ['KIDS'],
-    CONSOLIDADO: ['REG_EI','REG_EF','KIDS'],
+    CONSOLIDADO: ['REGULAR','KIDS'],
   };
 
   let rhmSeg = 'CONSOLIDADO';
@@ -3935,7 +3981,8 @@ renderAll = function() {
   function r2(v) { return Math.round(v*100)/100; }
 
   function getRec()  { return D?.receitaMensal    || []; }
-  function getInad() { return D?.inadimplenciaMensal || []; }
+  function getInad()      { return D?.inadimplenciaMensal      || []; }
+  function getInadAnual() { return D?.inadimplenciaAnualProg || []; }
 
   function getMeses() {
     const ano = document.getElementById('sel-rhm-ano')?.value || 'TODOS';
@@ -3956,7 +4003,7 @@ renderAll = function() {
       const rows = getInad().filter(r => String(r.ano_mes) === String(mes) && tipos.includes(r.tipo_debito));
       if (!rows.length) return null;
       const prev = rows.reduce((a,r)=>a+(r.vl_previsto||0),0);
-      const rec  = rows.reduce((a,r)=>a+(r.vl_recebido_no_mes||0),0);
+      const rec  = rows.reduce((a,r)=>a+(r.vl_rec_no_mes||0),0);
       const abr  = rows.reduce((a,r)=>a+(r.vl_em_aberto_fechamento||0),0);
       return { previsto:r2(prev), recebido:r2(rec), emAberto:r2(abr), gap:r2(prev-rec),
                realizacao: prev ? r2(rec/prev*100) : 0 };
@@ -3988,7 +4035,7 @@ renderAll = function() {
     const rows = getInad().filter(r => String(r.ano_mes) === String(mes) && tipos.includes(r.tipo_debito));
     if (!rows.length) return null;
     const prev = rows.reduce((a,r)=>a+(r.vl_previsto||0),0);
-    const recM = rows.reduce((a,r)=>a+(r.vl_recebido_no_mes||0),0);
+    const recM = rows.reduce((a,r)=>a+(r.vl_rec_no_mes||0),0);
     return prev ? r2(recM/prev*100) : 0;
   }
 
@@ -3996,25 +4043,48 @@ renderAll = function() {
   // Para REG_EI/EF usa aba 14 com split proporcional do vl_previsto da aba 16
   function inadHoje(mes, seg) {
     const s = seg || rhmSeg;
-    if (s === 'REG_EI' || s === 'REG_EF') {
-      // Previsto real do subgrupo (aba 16)
-      const tipos = TIPO_INAD[s];
-      const rowsI = getInad().filter(r => String(r.ano_mes) === String(mes) && tipos.includes(r.tipo_debito));
-      if (!rowsI.length) return null;
-      const prevSub = rowsI.reduce((a,r)=>a+(r.vl_previsto||0),0);
-      // Previsto total REGULAR (EI+EF) para calcular proporção
-      const tiposReg = TIPO_INAD['REGULAR'];
-      const rowsReg  = getInad().filter(r => String(r.ano_mes) === String(mes) && tiposReg.includes(r.tipo_debito));
-      const prevReg  = rowsReg.reduce((a,r)=>a+(r.vl_previsto||0),0);
-      if (!prevReg) return null;
-      const fator = prevSub / prevReg;
-      // Em aberto atual da aba 14 para MENSALIDADE REGULAR × fator
-      const rowsRec = getRec().filter(r => String(r.ano_mes) === String(mes) && r.grupo_receita === 'MENSALIDADE REGULAR');
-      const abrRec  = rowsRec.reduce((a,r)=>a+(r.vl_em_aberto||0),0);
-      return prevSub ? r2(abrRec * fator / prevSub * 100) : null;
-    }
-    const r = aggRecMes(mes, s);
-    return (!r || !r.previsto) ? null : r2(r.emAberto/r.previsto*100);
+    // vl_em_aberto_hoje da aba 16 / vl_previsto
+    const tipos = TIPO_INAD[s];
+    const rows = getInad().filter(r => String(r.ano_mes) === String(mes) && tipos.includes(r.tipo_debito));
+    if (!rows.length) return null;
+    const prev = rows.reduce((a,r)=>a+(r.vl_previsto||0),0);
+    const abr  = rows.reduce((a,r)=>a+(r.vl_em_aberto_hoje||0),0);
+    return prev ? r2(abr/prev*100) : null;
+  }
+
+  // calcAFim = inad anual progressiva (aba 16b): pct_inad_anual_fechamento por mes+segmento
+  // Cada valor = Σ em_aberto_fec(jan..mes) / Σ previsto(jan..mes) — calculado nos dados brutos
+  function calcAFim(mesesArr, seg) {
+    const s = seg || rhmSeg;
+    const tipos = TIPO_INAD[s];
+    const rows = getInadAnual();
+    // Indexar por ano_mes+tipo
+    const byMes = {};
+    rows.forEach(r => {
+      if (!tipos.includes(r.tipo_debito)) return;
+      if (!byMes[r.ano_mes]) byMes[r.ano_mes] = { prev: 0, abr: 0 };
+      byMes[r.ano_mes].prev += r.vl_previsto_acum       || 0;
+      byMes[r.ano_mes].abr  += r.vl_em_aberto_fechamento || 0;
+    });
+    return mesesArr.map(m => {
+      const d = byMes[String(m)];
+      if (!d || !d.prev) return null;
+      return r2(d.abr / d.prev * 100);
+    });
+  }
+
+  // inadHoje (KPI anual): usa pct_inad_anual_hoje de dez da aba 16b (ou último mês disponível)
+  function inadHojeAnual(ano, seg) {
+    const s = seg || rhmSeg;
+    const tipos = TIPO_INAD[s];
+    const rows = getInadAnual().filter(r => r.ano === ano && tipos.includes(r.tipo_debito));
+    if (!rows.length) return null;
+    // Pegar o mês mais alto disponível (== dez se ano fechado)
+    const ultMes = rows.reduce((max, r) => r.mes > max ? r.mes : max, 0);
+    const ultRows = rows.filter(r => r.mes === ultMes);
+    const prev = ultRows.reduce((a,r)=>a+(r.vl_previsto_acum||0),0);
+    const abr  = ultRows.reduce((a,r)=>a+(r.vl_em_aberto_hoje||0),0);
+    return prev ? r2(abr/prev*100) : null;
   }
 
   // ── chart helper ──────────────────────────────────────────────────────────
@@ -4067,6 +4137,7 @@ renderAll = function() {
     const aRec   = meses.map(m => aggRecMes(m));
     const aFec   = meses.map(m => inadFechamento(m));
     const aHoj   = meses.map(m => inadHoje(m));
+    const aFim   = calcAFim(meses);
     const aPrazo = meses.map(m => pagoNoMes(m));
 
     // arrays auxiliares para gráficos comparativos por modo
@@ -4086,6 +4157,8 @@ renderAll = function() {
     aFec.forEach(v=>{ if(v!=null) sF+=v; });
     aHoj.forEach(v=>{ if(v!=null) sH+=v; });
     aPrazo.forEach(v=>{ if(v!=null) sP+=v; });
+    // Fim do Ano = último valor não-nulo de aFim (= dezembro ou mês mais recente do ano)
+    const ultimoFim = [...aFim].reverse().find(v => v != null) ?? null;
     const av = v => c ? r2(v/c) : 0;
 
     // badge de nota para EI/EF (dados estimados por split proporcional)
@@ -4098,8 +4171,9 @@ renderAll = function() {
       {label:'Em Aberto',           value:fBRL(tA),      color:tA>0?'#fbbf24':'#34d399', sub:'posição atual'},
       {label:'% Realização (méd)',  value:fPct(av(sRl)), color:av(sRl)>=95?'#34d399':av(sRl)>=85?'#fbbf24':'#f87171', sub:'meta 100%'},
       {label:'% Pago no Mês (méd)',value:fPct(av(sP)),  color:av(sP)>=80?'#34d399':'#fbbf24', sub:'recebido no próprio mês'},
-      {label:'% Inad Fec (méd)',    value:fPct(av(sF)),  color:av(sF)<=3?'#34d399':av(sF)<=8?'#fbbf24':'#f87171', sub:'último dia mês'},
-      {label:'% Inad Hoje (méd)',   value:fPct(av(sH)),  color:av(sH)<=3?'#34d399':av(sH)<=8?'#fbbf24':'#f87171', sub:'posição atual'},
+      {label:'% Inad Fec (méd)',    value:fPct(av(sF)),   color:av(sF)<=3?'#34d399':av(sF)<=8?'#fbbf24':'#f87171', sub:'último dia mês'},
+      {label:'% Inad Fim Ano',      value:ultimoFim!=null?fPct(ultimoFim):'—', color:ultimoFim==null?'var(--muted)':ultimoFim<=3?'#34d399':ultimoFim<=8?'#fbbf24':'#f87171', sub:'acumulado até o mês atual'},
+      {label:'% Inad Hoje',   value:(()=>{const _a=document.getElementById('sel-rhm-ano')?.value||'TODOS';const _ano=_a==='TODOS'?Math.max(...meses.map(m=>parseInt(String(m).slice(0,4)))):parseInt(_a);const v=inadHojeAnual(_ano);return v!=null?fPct(v):'—';})(), color:(()=>{const _a=document.getElementById('sel-rhm-ano')?.value||'TODOS';const _ano=_a==='TODOS'?Math.max(...meses.map(m=>parseInt(String(m).slice(0,4)))):parseInt(_a);const v=inadHojeAnual(_ano);return v==null?'var(--muted)':v<=3?'#34d399':v<=8?'#fbbf24':'#f87171';})(), sub:'posição atual'},
     ].map(k=>`<div class="kpi-card">
       <div class="kpi-label">${k.label}</div>
       <div class="kpi-value" style="font-size:20px;color:${k.color}">${k.value}${noteEIEF&&k.label==='Previsto Total'?noteEIEF:''}</div>
@@ -4152,9 +4226,10 @@ renderAll = function() {
       ]},options:bOpts(true)});
     }
 
-    // ── CHART 3: dois cortes ─────────────────────────────────────────────────
+    // ── CHART 3: três cortes ─────────────────────────────────────────────────
     rhmMk('chart-rhm-tresCortes',{type:'line',data:{labels,datasets:[
       {label:'Inad. no Fechamento',data:aFec, borderColor:'#fbbf24',backgroundColor:'rgba(251,191,36,.07)',fill:true,tension:.3,pointRadius:3,borderWidth:2},
+      {label:'Inad. Fim do Ano',   data:aFim, borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,.05)',fill:false,tension:.3,pointRadius:3,borderWidth:2,borderDash:[5,3]},
       {label:'Inad. Hoje',         data:aHoj, borderColor:'#34d399',backgroundColor:'rgba(52,211,153,.07)',fill:true,tension:.3,pointRadius:3,borderWidth:2},
     ]},options:bOpts(true)});
 
@@ -4195,6 +4270,7 @@ renderAll = function() {
        <th style="text-align:right">Recebido</th><th style="text-align:right">Em Aberto</th><th style="text-align:right">Gap</th>
        <th style="text-align:right">% Real.</th><th style="text-align:right">% Pago Mês</th>
        <th style="text-align:right;color:#fbbf24">% Inad Fec.</th>
+       <th style="text-align:right;color:#a78bfa">% Inad Fim Ano</th>
        <th style="text-align:right;color:#34d399">% Inad Hoje</th>
        <th style="text-align:right">Δ Fec→Hoje</th>`;
 
@@ -4206,10 +4282,12 @@ renderAll = function() {
       if(!r){ rows+=`<tr><td class="td-mono">${fMes(m)}</td><td colspan="99" style="text-align:center;color:var(--muted);font-size:11px">sem dados</td></tr>`; return; }
       _tP+=r.previsto;_tR+=r.recebido;_tA+=r.emAberto;_tG+=r.gap;_sRl+=r.realizacao;_c++;
       if(aFec[i]!=null) _sF+=aFec[i]; if(aHoj[i]!=null) _sH+=aHoj[i]; if(aPrazo[i]!=null) _sP+=aPrazo[i];
+      // aFim acumulado removido — usa último valor não-nulo diretamente
       const clR=r.realizacao>=95?'#34d399':r.realizacao>=85?'#fbbf24':'#f87171';
-      const f=aFec[i],h=aHoj[i],delta=recD[i];
+      const f=aFec[i],h=aHoj[i],fim=aFim[i],delta=recD[i];
       const clF=f==null?'var(--muted)':f<=3?'#34d399':f<=8?'#fbbf24':'#f87171';
       const clH=h==null?'var(--muted)':h<=3?'#34d399':h<=8?'#fbbf24':'#f87171';
+      const clA=fim==null?'var(--muted)':fim<=3?'#34d399':fim<=8?'#fbbf24':'#f87171';
       let extTd = '';
       if(rhmSeg==='CONSOLIDADO') extTd=`<td class="td-mono td-right" style="color:#4f7cff">${aReg[i]?fBRL(aReg[i].previsto):'—'}</td><td class="td-mono td-right" style="color:#22d3ee">${aKid[i]?fBRL(aKid[i].previsto):'—'}</td>`;
       if(rhmSeg==='REGULAR')     extTd=`<td class="td-mono td-right" style="color:#a78bfa">${aEI[i]?fBRL(aEI[i].previsto):'—'}</td><td class="td-mono td-right" style="color:#fb923c">${aEF[i]?fBRL(aEF[i].previsto):'—'}</td>`;
@@ -4222,6 +4300,7 @@ renderAll = function() {
         <td class="td-mono td-right" style="color:${clR};font-weight:600">${fPct(r.realizacao)}</td>
         <td class="td-mono td-right">${aPrazo[i]!=null?fPct(aPrazo[i]):'—'}</td>
         <td class="td-mono td-right" style="color:${clF};font-weight:600">${f!=null?fPct(f):'—'}</td>
+        <td class="td-mono td-right" style="color:${clA}">${fim!=null?fPct(fim):'—'}</td>
         <td class="td-mono td-right" style="color:${clH};font-weight:600">${h!=null?fPct(h):'—'}</td>
         <td class="td-mono td-right" style="color:${delta==null?'var(--muted)':delta>=0?'#34d399':'#f87171'}">${delta!=null?fPct(delta)+' pp':'—'}</td>
       </tr>`;
@@ -4241,6 +4320,7 @@ renderAll = function() {
       <td class="td-mono td-right">${fPct(av2(_sRl))}</td>
       <td class="td-mono td-right">${fPct(av2(_sP))}</td>
       <td class="td-mono td-right" style="color:#fbbf24;font-weight:700">${fPct(av2(_sF))}</td>
+      <td class="td-mono td-right" style="color:#a78bfa">${(()=>{const v=[...aFim].reverse().find(v=>v!=null)??null;return v!=null?fPct(v):'—';})()}</td>
       <td class="td-mono td-right" style="color:#34d399;font-weight:700">${fPct(av2(_sH))}</td>
       <td></td>
     </tr>`;
@@ -4252,7 +4332,7 @@ renderAll = function() {
       const wst=aRec.reduce((b,r,i)=>r&&(b===null||r.realizacao<aRec[b].realizacao)?i:b,null);
       insEl.innerHTML=[
         {icon:'📌',text:`Melhor mês: ${bst!=null?fMes(meses[bst]):'—'} (${bst!=null?fPct(aRec[bst].realizacao):'—'}). Pior mês: ${wst!=null?fMes(meses[wst]):'—'} (${wst!=null?fPct(aRec[wst].realizacao):'—'}).`},
-        {icon:'💰',text:`Inad. média no fechamento: ${fPct(av2(_sF))}. Posição hoje: ${fPct(av2(_sH))}. Recuperação média ${fPct(r2(av2(_sF)-av2(_sH)))} pp/mês.`},
+        {icon:'💰',text:`Inad. média no fechamento: ${fPct(av2(_sF))}. Fim do ano: ${(()=>{const v=[...aFim].reverse().find(v=>v!=null)??null;return v!=null?fPct(v):'—';})()}. Posição hoje: ${fPct(av2(_sH))}. Recuperação média ${fPct(r2(av2(_sF)-av2(_sH)))} pp/mês.`},
         {icon:'💡',text:`Gap total: ${fBRL(_tG)} — diferença entre emitido e recebido no período (${lbl}).`},
       ].map(i=>`<div class="insight-item"><span class="insight-icon">${i.icon}</span><span>${i.text}</span></div>`).join('');
     }

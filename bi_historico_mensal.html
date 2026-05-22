@@ -1,0 +1,1568 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Histórico Mensal · Einstein Palmas</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg:        #0b0d12;
+  --surface:   #111318;
+  --surface2:  #181c25;
+  --surface3:  #0e1016;
+  --border:    #1e2436;
+  --border2:   #242c3f;
+  --accent:    #00e5a0;
+  --accent2:   #4f7cff;
+  --purple:    #a78bfa;
+  --orange:    #fb923c;
+  --cyan:      #22d3ee;
+  --yellow:    #fbbf24;
+  --green:     #34d399;
+  --red:       #f87171;
+  --text:      #e2e8f0;
+  --muted:     #64748b;
+  --font-sans: 'DM Sans', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--font-sans); background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+
+/* ── HEADER ─────────────────────────────────────────────── */
+.page-header {
+  padding: 1.25rem 2rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem;
+}
+.page-title { font-size: 1.3rem; font-weight: 700; letter-spacing: -.02em; }
+.page-title em { color: var(--accent); font-style: normal; }
+.header-meta { font-size: .72rem; font-family: var(--font-mono); color: var(--muted); }
+.btn-refresh {
+  background: transparent; border: 1px solid var(--border2);
+  color: var(--muted); font-family: var(--font-sans); font-size: .75rem;
+  padding: .3rem .75rem; border-radius: 6px; cursor: pointer;
+  transition: all .15s;
+}
+.btn-refresh:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── FILTROS ─────────────────────────────────────────────── */
+.filter-bar {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: .9rem 2rem; display: flex; align-items: flex-end; flex-wrap: wrap; gap: 1rem;
+}
+.filter-group { display: flex; flex-direction: column; gap: .25rem; }
+.filter-group label { font-size: .62rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.filter-select {
+  background: var(--surface2); border: 1px solid var(--border2);
+  color: var(--text); font-family: var(--font-sans); font-size: .8rem;
+  padding: .35rem .65rem; border-radius: 6px; cursor: pointer;
+  min-width: 130px; outline: none;
+}
+.filter-select:focus { border-color: var(--accent); }
+.filter-sep { width: 1px; height: 32px; background: var(--border); align-self: flex-end; }
+
+/* ── SEGMENTOS ───────────────────────────────────────────── */
+.seg-bar {
+  background: var(--surface3); border-bottom: 1px solid var(--border);
+  padding: .6rem 2rem; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+}
+.seg-btn {
+  border: 1px solid var(--border2); background: var(--surface2);
+  color: var(--muted); font-family: var(--font-sans); font-size: .76rem;
+  padding: .28rem .75rem; border-radius: 20px; cursor: pointer;
+  transition: all .15s; white-space: nowrap;
+}
+.seg-btn:hover { border-color: var(--border2); color: var(--text); }
+.seg-btn.active { border-color: currentColor; font-weight: 600; background: rgba(255,255,255,.04); }
+.seg-btn[data-seg="CONSOLIDADO"].active { color: var(--accent); }
+.seg-btn[data-seg="REGULAR"].active    { color: var(--accent2); }
+.seg-btn[data-seg="EI"].active         { color: var(--purple); }
+.seg-btn[data-seg="EF"].active         { color: var(--orange); }
+.seg-btn[data-seg="KIDS"].active       { color: var(--cyan); }
+.seg-note { font-size: .68rem; color: var(--muted); font-family: var(--font-mono); margin-left: .5rem; }
+
+/* ── KPI STRIP ───────────────────────────────────────────── */
+.kpi-strip {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1px; background: var(--border); border-bottom: 1px solid var(--border);
+}
+.kpi-card {
+  background: var(--surface); padding: .85rem 1.1rem;
+  display: flex; flex-direction: column; gap: .25rem;
+}
+.kpi-label { font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.kpi-value { font-size: 1.3rem; font-weight: 700; font-family: var(--font-mono); line-height: 1; }
+.kpi-sub   { font-size: .68rem; color: var(--muted); font-family: var(--font-mono); }
+
+/* ── CHARTS ──────────────────────────────────────────────── */
+.charts-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 1px; background: var(--border);
+}
+@media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+.chart-panel { background: var(--surface2); padding: 1.25rem 1.5rem; }
+.chart-panel.full { grid-column: 1/-1; }
+.chart-title { font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 1rem; display: flex; align-items: center; gap: .5rem; }
+.chart-title em { color: var(--text); font-style: normal; font-size: .82rem; }
+.chart-wrap { position: relative; height: 220px; }
+.chart-wrap.tall { height: 280px; }
+
+/* ── TABELA ──────────────────────────────────────────────── */
+.table-section { border-top: 1px solid var(--border); }
+.table-toolbar {
+  background: var(--surface); padding: .75rem 2rem;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem;
+  border-bottom: 1px solid var(--border);
+}
+.table-title { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; }
+.table-actions { display: flex; gap: .5rem; }
+.btn-export {
+  background: var(--surface2); border: 1px solid var(--border2);
+  color: var(--muted); font-family: var(--font-sans); font-size: .72rem;
+  padding: .28rem .7rem; border-radius: 5px; cursor: pointer; transition: all .15s;
+}
+.btn-export:hover { border-color: var(--accent); color: var(--accent); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: .76rem; }
+thead th {
+  background: var(--surface3); color: var(--muted); font-size: .64rem;
+  text-transform: uppercase; letter-spacing: .07em; padding: .5rem .75rem;
+  text-align: right; border-bottom: 1px solid var(--border2); white-space: nowrap;
+  position: sticky; top: 0; z-index: 10;
+}
+thead th:first-child { text-align: left; }
+tbody tr { border-bottom: 1px solid rgba(255,255,255,.03); }
+tbody tr:hover { background: rgba(255,255,255,.02); }
+tbody td { padding: .4rem .75rem; text-align: right; white-space: nowrap; }
+tbody td:first-child { text-align: left; font-family: var(--font-sans); }
+tbody .yr-row td { background: rgba(79,124,255,.04); color: var(--accent2); font-size: .69rem; letter-spacing: .08em; padding: .3rem .75rem; }
+tfoot td { background: var(--surface); font-weight: 700; padding: .5rem .75rem; text-align: right; border-top: 2px solid var(--border2); }
+tfoot td:first-child { text-align: left; }
+
+/* ── LOADING / ERROR ─────────────────────────────────────── */
+.status-bar {
+  padding: .5rem 2rem; font-size: .72rem; font-family: var(--font-mono);
+  color: var(--muted); background: var(--surface3);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: .5rem;
+}
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); }
+.status-dot.ok { background: var(--green); }
+.status-dot.err { background: var(--red); }
+.loading-overlay {
+  position: fixed; inset: 0; background: rgba(11,13,18,.85);
+  display: flex; align-items: center; justify-content: center; z-index: 999;
+}
+.loading-box { text-align: center; }
+.loading-spinner {
+  width: 40px; height: 40px; border: 3px solid var(--border2);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .7s linear infinite; margin: 0 auto 1rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.hidden { display: none !important; }
+
+/* ── INSIGHTS ────────────────────────────────────────────── */
+.insights-bar {
+  padding: .75rem 2rem; background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; flex-wrap: wrap; gap: .75rem;
+}
+.ins-item {
+  font-size: .76rem; color: var(--muted); display: flex; align-items: flex-start; gap: .35rem;
+  flex: 1 1 300px;
+}
+.ins-item .icon { color: var(--accent); flex-shrink: 0; }
+
+  /* ── LAYOUT COM SIDEBAR ─────────────────────────────────────── */
+  .app-shell { display: flex; min-height: 100vh; }
+  .sidebar-nav {
+    width: 210px; min-height: 100vh; background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto; flex-shrink: 0;
+  }
+  .sidebar-header { padding: 18px 16px 14px; border-bottom: 1px solid var(--border); }
+  .sidebar-header .s-label { font-family: var(--font-mono); font-size: 9px; color: var(--accent); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 3px; }
+  .sidebar-header h2 { font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.3; }
+  .nav-section { padding: 12px 12px 4px; font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: .14em; text-transform: uppercase; }
+  .nav-item { display: flex; align-items: center; gap: 9px; padding: 8px 16px; font-size: 12px; color: var(--muted); cursor: pointer; border-left: 2px solid transparent; transition: all .15s; user-select: none; }
+  .nav-item:hover { color: var(--text); background: rgba(79,124,255,.06); }
+  .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(79,124,255,.08); font-weight: 600; }
+  .nav-icon { width: 15px; text-align: center; font-size: 13px; }
+  .main-area { flex: 1; overflow-x: hidden; min-width: 0; }
+  .view { display: none; }
+  .view.active { display: block; animation: fadeInV .18s ease; }
+  @keyframes fadeInV { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .kpi-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .kpi-card .kpi-value { font-size: 22px; font-weight: 700; font-family: var(--font-mono); line-height: 1.1; margin-bottom: 4px; }
+  .kpi-card .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 2px; }
+  .kpi-card .kpi-sub   { font-size: 10px; color: var(--muted); font-family: var(--font-mono); }
+  .chart-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; margin-bottom: 16px; }
+  .chart-card-title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+  .chart-card .chart-wrap canvas { max-height: 280px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 1000px) { .grid-2 { grid-template-columns: 1fr; } }
+  .filter-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .filter-row select, .filter-row input { background: var(--surface2); border: 1px solid var(--border2); color: var(--text); font-family: var(--font-sans); font-size: .78rem; padding: .3rem .6rem; border-radius: 6px; outline: none; min-width: 130px; }
+  .filter-row select:focus, .filter-row input:focus { border-color: var(--accent); }
+  .inad-content { padding: 20px 24px; }
+  .table-wrap { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; overflow: auto; margin-bottom: 16px; }
+  .table-wrap table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .table-wrap thead th { background: var(--surface); padding: 9px 12px; text-align: left; font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: .07em; text-transform: uppercase; border-bottom: 1px solid var(--border); white-space: nowrap; cursor: pointer; user-select: none; }
+  .table-wrap thead th:hover { color: var(--text); }
+  .table-wrap thead th.sort-asc::after  { content: ' ↑'; color: var(--accent); }
+  .table-wrap thead th.sort-desc::after { content: ' ↓'; color: var(--accent); }
+  .table-wrap tbody tr { border-bottom: 1px solid var(--border2); transition: background .1s; }
+  .table-wrap tbody tr:hover { background: rgba(79,124,255,.04); }
+  .table-wrap tbody td { padding: 8px 12px; color: var(--text); white-space: nowrap; }
+  .insights-panel { background: linear-gradient(135deg,rgba(79,124,255,.06),rgba(124,92,252,.04)); border: 1px solid rgba(79,124,255,.25); border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; }
+  .insights-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .insights-title { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
+  .insights-fixed { display: flex; flex-direction: column; gap: 6px; }
+  .insight-item { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.5; color: #c8cde0; }
+  .insight-icon { font-size: 12px; margin-top: 1px; flex-shrink: 0; width: 16px; text-align: center; }
+  .btn-ia { display: flex; align-items: center; gap: 5px; background: rgba(124,92,252,.15); border: 1px solid rgba(124,92,252,.35); color: #a78bfa; font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 20px; cursor: pointer; transition: all .2s; }
+  .btn-ia:hover:not(:disabled) { background: rgba(124,92,252,.28); border-color: rgba(124,92,252,.6); color: #c4b5fd; }
+  .btn-ia:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-ia .ia-dot { width: 5px; height: 5px; background: #7c5cfc; border-radius: 50%; animation: pulse-dot 1.4s ease-in-out infinite; display: none; }
+  .btn-ia.loading .ia-dot { display: inline-block; }
+  .btn-ia.loading .ia-label { display: none; }
+  @keyframes pulse-dot { 0%,100%{opacity:.3;transform:scale(.8)} 50%{opacity:1;transform:scale(1.2)} }
+  .ia-response { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(79,124,255,.15); display: none; }
+  .ia-response.visible { display: block; }
+  .ia-response-label { font-family: var(--font-mono); font-size: 10px; color: #7c5cfc; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 8px; }
+  .ia-response-text { font-size: 12px; line-height: 1.7; color: #c8cde0; white-space: pre-wrap; }
+  .ia-response-text strong { color: var(--text); font-weight: 600; }
+  .ia-cursor { display: inline-block; width: 2px; height: 13px; background: #7c5cfc; border-radius: 1px; margin-left: 2px; vertical-align: middle; animation: blink .7s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .tooltip-chip { font-family: var(--font-mono); font-size: 10px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); padding: 1px 7px; border-radius: 20px; }
+</style>
+</head>
+<body>
+
+<div id="loading-overlay" class="loading-overlay">
+  <div class="loading-box">
+    <div class="loading-spinner"></div>
+    <div style="font-family:var(--font-mono);font-size:.8rem;color:var(--muted)">carregando dados…</div>
+  </div>
+</div>
+
+<div class="app-shell hidden" id="app-shell">
+
+  <nav class="sidebar-nav">
+    <div class="sidebar-header">
+      <div class="s-label">Einstein Palmas</div>
+      <h2>Histórico<br>Mensal</h2>
+    </div>
+    <div class="nav-section">RECEITA</div>
+    <div class="nav-item active" data-view="hist-mensal">
+      <span class="nav-icon">📈</span> Histórico Mensal
+    </div>
+    <div class="nav-section">INADIMPLÊNCIA</div>
+    <div class="nav-item" data-view="inad-visao-geral">
+      <span class="nav-icon">⚠</span> Visão Geral
+    </div>
+    <div class="nav-item" data-view="inad-mensal">
+      <span class="nav-icon">📆</span> Fechamento Mensal
+    </div>
+    <div class="nav-item" data-view="inad-turma">
+      <span class="nav-icon">🏛</span> Por Turma
+    </div>
+    <div class="nav-item" data-view="inad-aluno">
+      <span class="nav-icon">👤</span> Por Aluno
+    </div>
+    <div class="nav-item" data-view="inad-concentracao">
+      <span class="nav-icon">🎯</span> Concentração
+    </div>
+  </nav>
+
+  <div class="main-area">
+
+    <div class="page-header">
+      <div>
+        <div class="page-title" id="view-page-title">Receita · <em>Histórico Mensal</em></div>
+        <div class="header-meta">Einstein Palmas — 2017–2026</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:1rem">
+        <span id="status-ts" class="header-meta">—</span>
+        <button class="btn-refresh" onclick="loadData()">↺ Atualizar</button>
+      </div>
+    </div>
+    <div class="status-bar">
+      <span id="status-dot" class="status-dot"></span>
+      <span id="status-txt">conectando…</span>
+    </div>
+
+    <div class="view active" id="view-hist-mensal">
+<!-- FILTROS ANO / MÊS -->
+<div class="filter-bar">
+  <div class="filter-group">
+    <label>Ano</label>
+    <select id="sel-ano" class="filter-select" onchange="onFiltroChange()">
+      <option value="TODOS">Todos os anos</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Meses</label>
+    <select id="sel-meses" class="filter-select" onchange="onFiltroChange()">
+      <option value="TODOS">Todos os meses</option>
+      <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+      <option value="3">Março</option><option value="4">Abril</option>
+      <option value="5">Maio</option><option value="6">Junho</option>
+      <option value="7">Julho</option><option value="8">Agosto</option>
+      <option value="9">Setembro</option><option value="10">Outubro</option>
+      <option value="11">Novembro</option><option value="12">Dezembro</option>
+    </select>
+  </div>
+  <div class="filter-sep"></div>
+  <div class="filter-group">
+    <label>Tipo de Receita</label>
+    <select id="sel-grupo" class="filter-select" onchange="onFiltroChange()">
+      <option value="MENSALIDADE">Mensalidades</option>
+      <option value="TODAS">Todos os tipos</option>
+    </select>
+  </div>
+</div>
+
+<!-- SEGMENTOS -->
+<div class="seg-bar">
+  <button class="seg-btn active" data-seg="CONSOLIDADO" onclick="setSeg(this)">Consolidado</button>
+  <button class="seg-btn"        data-seg="REGULAR"     onclick="setSeg(this)">Regular (EI+EF)</button>
+  <button class="seg-btn"        data-seg="EI"          onclick="setSeg(this)">Regular — Ed. Infantil</button>
+  <button class="seg-btn"        data-seg="EF"          onclick="setSeg(this)">Regular — Ens. Fund.</button>
+  <button class="seg-btn"        data-seg="KIDS"        onclick="setSeg(this)">Kids</button>
+  <span class="seg-note" id="seg-note"></span>
+</div>
+
+<!-- KPIs -->
+<div id="kpi-strip" class="kpi-strip"></div>
+
+<!-- CHARTS -->
+<div class="charts-grid" id="charts-grid">
+
+  <!-- 1: Previsto × Recebido × Em Aberto (anual) -->
+  <div class="chart-panel full">
+    <div class="chart-title">
+      <span>📊</span> <em>Previsto × Recebido × Em Aberto</em>
+      <span style="margin-left:auto;font-size:.68rem;color:var(--muted)" id="chart1-note"></span>
+    </div>
+    <div class="chart-wrap tall"><canvas id="chart-prevrec"></canvas></div>
+  </div>
+
+  <!-- 2: % Realização Mensal -->
+  <div class="chart-panel">
+    <div class="chart-title"><span>✅</span> <em>% Realizado Mensal</em></div>
+    <div class="chart-wrap"><canvas id="chart-realizacao"></canvas></div>
+  </div>
+
+  <!-- 3: Três Cortes de Inadimplência -->
+  <div class="chart-panel">
+    <div class="chart-title">
+      <span>📉</span> <em>3 Cortes de Inadimplência</em>
+      <span style="font-size:.65rem;color:var(--muted);margin-left:.5rem">Fec · Fim Ano · Hoje</span>
+    </div>
+    <div class="chart-wrap"><canvas id="chart-trescortes"></canvas></div>
+  </div>
+
+  <!-- 4: % Pago no Prazo -->
+  <div class="chart-panel">
+    <div class="chart-title"><span>🟢</span> <em>Pago até o Fechamento do Mês</em></div>
+    <div class="chart-wrap"><canvas id="chart-prazo"></canvas></div>
+  </div>
+
+  <!-- 5: Recuperação Pós-Fechamento -->
+  <div class="chart-panel">
+    <div class="chart-title">
+      <span>🔄</span> <em>Recuperação Pós-Fechamento</em>
+      <span style="font-size:.65rem;color:var(--muted);margin-left:.5rem">Δ Inad.Fec → Hoje (pp)</span>
+    </div>
+    <div class="chart-wrap"><canvas id="chart-recuperacao"></canvas></div>
+  </div>
+
+</div><!-- /charts-grid -->
+
+<!-- INSIGHTS -->
+<div class="insights-bar" id="insights-bar"></div>
+
+<!-- TABELA -->
+<div class="table-section">
+  <div class="table-toolbar">
+    <span class="table-title">Tabela Histórica Completa</span>
+    <div class="table-actions">
+      <button class="btn-export" onclick="exportXLS()">⬇ Excel</button>
+      <button class="btn-export" onclick="exportPDF()">⬇ PDF</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="table-historico">
+      <thead><tr id="thead-row"></tr></thead>
+      <tbody id="tbody-historico"></tbody>
+      <tfoot><tr id="tfoot-row"></tr></tfoot>
+    </table>
+  </div>
+</div>
+    </div><!-- /view-hist-mensal -->
+
+    <!-- VIEWS INADIMPLÊNCIA -->
+    <div class="view inad-content" id="view-inad-visao-geral">
+        <div class="insights-panel" id="ins-inad-visao-geral">
+          <div class="insights-header">
+            <div class="insights-title">Inadimplência · Visão Geral</div>
+            <button class="btn-ia" id="btn-ia-inad-visao-geral" onclick="chamarIA('inad-visao-geral')">
+              <div class="ia-dot"></div><span class="ia-label">✦ Análise CFO</span>
+            </button>
+          </div>
+          <div class="insights-fixed" id="ins-fixed-inad-visao-geral"></div>
+          <div class="ia-response" id="ia-resp-inad-visao-geral">
+            <div class="ia-response-label">Análise CFO · Einstein Palmas</div>
+            <div class="ia-response-text" id="ia-text-inad-visao-geral"></div>
+          </div>
+        </div>
+        <div class="kpi-grid" id="kpi-inad-visao-geral"></div>
+        <div class="grid-2">
+          <div class="chart-card">
+            <div class="chart-card-title">Valor em Aberto por Ano <span class="tooltip-chip">snapshot atual</span></div>
+            <div class="chart-wrap"><canvas id="chart-inad-anual"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">% Inadimplência por Ano</div>
+            <div class="chart-wrap"><canvas id="chart-inad-pct-anual"></canvas></div>
+          </div>
+        </div>
+      </div><!-- /view-inad-visao-geral -->
+
+    <div class="view inad-content" id="view-inad-mensal">
+        <div class="insights-panel" id="ins-inad-mensal">
+          <div class="insights-header">
+            <div class="insights-title">Inadimplência — Fechamento Mensal</div>
+            <button class="btn-ia" id="btn-ia-inad-mensal" onclick="chamarIA('inad-mensal')">
+              <div class="ia-dot"></div><span class="ia-label">✦ Análise CFO</span>
+            </button>
+          </div>
+          <div class="insights-fixed" id="ins-fixed-inad-mensal"></div>
+          <div class="ia-response" id="ia-resp-inad-mensal">
+            <div class="ia-response-label">Análise CFO · Einstein Palmas</div>
+            <div class="ia-response-text" id="ia-text-inad-mensal"></div>
+          </div>
+        </div>
+        <div class="filter-row">
+          <select id="sel-ano-inad-mensal" onchange="renderInadMensal()">
+            <option value="">Todos os anos</option>
+          </select>
+          <select id="sel-tipo-inad-mensal" onchange="renderInadMensal()">
+            <option value="">Todos os tipos</option>
+            <option>MENSALIDADES</option><option>KIDS</option>
+          </select>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">% Inadimplência no Fechamento de Cada Mês</div>
+          <div class="chart-wrap"><canvas id="chart-inad-mensal-line"></canvas></div>
+        </div>
+        <div class="chart-card" style="margin-top:16px">
+          <div class="chart-card-title">Valor em Aberto no Fechamento Mensal (R$)</div>
+          <div class="chart-wrap"><canvas id="chart-inad-mensal-bar"></canvas></div>
+        </div>
+      </div><!-- /view-inad-mensal -->
+
+    <div class="view inad-content" id="view-inad-turma">
+        <div class="insights-panel" id="ins-inad-turma">
+          <div class="insights-header">
+            <div class="insights-title">Inadimplência por Turma</div>
+            <button class="btn-ia" id="btn-ia-inad-turma" onclick="chamarIA('inad-turma')">
+              <div class="ia-dot"></div><span class="ia-label">✦ Análise CFO</span>
+            </button>
+          </div>
+          <div class="insights-fixed" id="ins-fixed-inad-turma"></div>
+          <div class="ia-response" id="ia-resp-inad-turma">
+            <div class="ia-response-label">Análise CFO · Einstein Palmas</div>
+            <div class="ia-response-text" id="ia-text-inad-turma"></div>
+          </div>
+        </div>
+        <div class="filter-row">
+          <select id="sel-ano-inad-turma" onchange="renderInadTurma()"><option value="">Todos os anos</option></select>
+          <select id="sel-tipo-inad-turma" onchange="renderInadTurma()">
+            <option value="">Todos os tipos</option><option>MENSALIDADES</option><option>KIDS</option>
+          </select>
+        </div>
+        <div class="grid-2">
+          <div class="chart-card">
+            <div class="chart-card-title">Top 20 Turmas — % Inadimplência Atual</div>
+            <div class="chart-wrap" style="height:420px"><canvas id="chart-inad-turma-rank"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">Detalhamento por Turma</div>
+            <div class="table-wrap">
+              <table id="table-inad-turma">
+                <thead><tr>
+                  <th onclick="sortTable('table-inad-turma',0)">Turma</th>
+                  <th onclick="sortTable('table-inad-turma',1)">Tipo</th>
+                  <th onclick="sortTable('table-inad-turma',2)">Alunos</th>
+                  <th onclick="sortTable('table-inad-turma',3)">Previsto</th>
+                  <th onclick="sortTable('table-inad-turma',4)">Em Aberto</th>
+                  <th onclick="sortTable('table-inad-turma',5)">% Inadimp.</th>
+                  <th onclick="sortTable('table-inad-turma',6)">Dias Atraso</th>
+                </tr></thead>
+                <tbody id="tbody-inad-turma"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div><!-- /view-inad-turma -->
+
+    <div class="view inad-content" id="view-inad-aluno">
+        <div class="insights-panel" id="ins-inad-aluno">
+          <div class="insights-header">
+            <div class="insights-title">Inadimplência por Aluno</div>
+            <button class="btn-ia" id="btn-ia-inad-aluno" onclick="chamarIA('inad-aluno')">
+              <div class="ia-dot"></div><span class="ia-label">✦ Análise CFO</span>
+            </button>
+          </div>
+          <div class="insights-fixed" id="ins-fixed-inad-aluno"></div>
+          <div class="ia-response" id="ia-resp-inad-aluno">
+            <div class="ia-response-label">Análise CFO · Einstein Palmas</div>
+            <div class="ia-response-text" id="ia-text-inad-aluno"></div>
+          </div>
+        </div>
+        <div class="filter-row">
+          <input type="text" id="search-inad-aluno" placeholder="Buscar aluno..." oninput="renderInadAluno()" style="flex:2">
+          <select id="sel-risco-inad-aluno" onchange="renderInadAluno()">
+            <option value="">Todos os riscos</option>
+            <option>RISCO CRITICO</option><option>RISCO ALTO</option>
+            <option>RISCO MEDIO</option><option>RISCO BAIXO</option><option>ADIMPLENTE</option>
+          </select>
+          <select id="sel-ano-inad-aluno" onchange="renderInadAluno()"><option value="">Todos os anos</option></select>
+        </div>
+        <div class="table-wrap">
+          <table id="table-inad-aluno">
+            <thead><tr>
+              <th onclick="sortTable('table-inad-aluno',0)">Aluno</th>
+              <th onclick="sortTable('table-inad-aluno',1)">Turma</th>
+              <th onclick="sortTable('table-inad-aluno',2)">Parcelas</th>
+              <th onclick="sortTable('table-inad-aluno',3)">Em Aberto</th>
+              <th onclick="sortTable('table-inad-aluno',4)">Vl. Aberto (R$)</th>
+              <th onclick="sortTable('table-inad-aluno',5)">% Inadimp.</th>
+              <th onclick="sortTable('table-inad-aluno',6)">Dias Atraso</th>
+              <th onclick="sortTable('table-inad-aluno',7)">Risco</th>
+            </tr></thead>
+            <tbody id="tbody-inad-aluno"></tbody>
+          </table>
+        </div>
+      </div><!-- /view-inad-aluno -->
+
+    <div class="view inad-content" id="view-inad-concentracao">
+        <div class="insights-panel" id="ins-inad-concentracao">
+          <div class="insights-header">
+            <div class="insights-title">Concentração de Inadimplência — Pareto</div>
+            <button class="btn-ia" id="btn-ia-inad-concentracao" onclick="chamarIA('inad-concentracao')">
+              <div class="ia-dot"></div><span class="ia-label">✦ Análise CFO</span>
+            </button>
+          </div>
+          <div class="insights-fixed" id="ins-fixed-inad-concentracao"></div>
+          <div class="ia-response" id="ia-resp-inad-concentracao">
+            <div class="ia-response-label">Análise CFO · Einstein Palmas</div>
+            <div class="ia-response-text" id="ia-text-inad-concentracao"></div>
+          </div>
+        </div>
+        <div class="kpi-grid" id="kpi-inad-concentracao"></div>
+        <div class="chart-card">
+          <div class="chart-card-title">Curva de Pareto — Top 50 Inadimplentes</div>
+          <div class="chart-wrap" style="height:360px"><canvas id="chart-pareto"></canvas></div>
+        </div>
+        <div class="chart-card" style="margin-top:16px">
+          <div class="chart-card-title">Ranking Completo</div>
+          <div class="table-wrap">
+            <table id="table-inad-conc">
+              <thead><tr>
+                <th>#</th><th onclick="sortTable('table-inad-conc',1)">Aluno</th>
+                <th onclick="sortTable('table-inad-conc',2)">Turma</th>
+                <th onclick="sortTable('table-inad-conc',3)">Parcelas</th>
+                <th onclick="sortTable('table-inad-conc',4)">Vl. Aberto</th>
+                <th onclick="sortTable('table-inad-conc',5)">Dias Máx.</th>
+                <th onclick="sortTable('table-inad-conc',6)">% do Total</th>
+                <th onclick="sortTable('table-inad-conc',7)">% Acum.</th>
+              </tr></thead>
+              <tbody id="tbody-inad-conc"></tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /view-inad-concentracao -->
+
+  </div><!-- /main-area -->
+</div><!-- /app-shell -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CONFIGURAÇÃO
+// ═══════════════════════════════════════════════════════════════════
+const GAS_URL  = 'https://script.google.com/macros/s/AKfycby5SBjeMwiw6SkigxH82s8j81TmH5SIgAcFUW19EgcAoNclCKqi3DRTFEdA2hBq6RxM/exec';
+const JSON_URL = GAS_URL + '?action=data';
+const NOMES_MES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+let D        = null;
+let seg      = 'CONSOLIDADO';
+let charts   = {};
+
+// ── Helpers formatação ──────────────────────────────────────────
+const FN = new Intl.NumberFormat('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+function fBRL(v) {
+  if (v == null) return '—';
+  const a = Math.abs(v);
+  if (a >= 1e6) return (v<0?'-':'') + 'R$ ' + (a/1e6).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}) + ' Mi';
+  if (a >= 1000) return (v<0?'-':'') + 'R$ ' + (a/1000).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0}) + ' Mil';
+  return (v<0?'-':'') + 'R$ ' + FN.format(a);
+}
+function fBRLFull(v) {
+  if (v == null) return '—';
+  return (v<0?'-':'') + 'R$ ' + FN.format(Math.abs(v));
+}
+function fPct(v, dec=2) { return v == null ? '—' : v.toLocaleString('pt-BR',{minimumFractionDigits:dec,maximumFractionDigits:dec})+'%'; }
+function fMes(m)  { const [a,mo]=String(m).split('-'); return NOMES_MES[parseInt(mo)-1]+'/'+a; }
+function r2(v)    { return Math.round(v*100)/100; }
+function clInad(v) { return v==null?'var(--muted)':v<=3?'var(--green)':v<=8?'var(--yellow)':'var(--red)'; }
+function clReal(v) { return v==null?'var(--muted)':v>=95?'var(--green)':v>=85?'var(--yellow)':'var(--red)'; }
+
+// ═══════════════════════════════════════════════════════════════════
+// DADOS — fuentes e derivações
+// ═══════════════════════════════════════════════════════════════════
+
+// Aba 16: REGULAR | KIDS (mensal)
+function getInad16() { return D?.inadimplenciaMensal || []; }
+// Aba 16b: acumulado progressivo (REGULAR | KIDS)
+function getInad16b() { return D?.inadimplenciaAnualProg || []; }
+// Aba 16c: split EI | EF (mensal, derivado da aba 15)
+function getInad16c() { return D?.inadimplenciaEiEf || []; }
+// Aba 14: receita mensal por grupo
+function getRec14() { return D?.receitaMensal || []; }
+
+// tipo_debito ou segmento para filtragem
+const SEG_FONTE = {
+  CONSOLIDADO: { aba:'16',  campo:'tipo_debito', valores:['REGULAR','KIDS'] },
+  REGULAR:     { aba:'16',  campo:'tipo_debito', valores:['REGULAR'] },
+  EI:          { aba:'16c', campo:'segmento',    valores:['EI'] },
+  EF:          { aba:'16c', campo:'segmento',    valores:['EF'] },
+  KIDS:        { aba:'16',  campo:'tipo_debito', valores:['KIDS'] },
+};
+// grupos da aba 14 para previsto/recebido/em_aberto histórico
+const SEG_GRUPOS14 = {
+  CONSOLIDADO: ['MENSALIDADE REGULAR','MENSALIDADE KIDS'],
+  REGULAR:     ['MENSALIDADE REGULAR'],
+  EI:          ['MENSALIDADE REGULAR'],  // proporção derivada
+  EF:          ['MENSALIDADE REGULAR'],  // proporção derivada
+  KIDS:        ['MENSALIDADE KIDS'],
+};
+const SEG_COR = { CONSOLIDADO:'#00e5a0', REGULAR:'#4f7cff', EI:'#a78bfa', EF:'#fb923c', KIDS:'#22d3ee' };
+const SEG_LABEL = { CONSOLIDADO:'Consolidado', REGULAR:'Regular (EI+EF)', EI:'Regular — Ed. Infantil', EF:'Regular — Ens. Fund.', KIDS:'Kids' };
+
+// ─── filtra meses conforme selects ─────────────────────────────
+function getMeses() {
+  if (!D) return [];
+  const ano   = document.getElementById('sel-ano')?.value || 'TODOS';
+  const mesF  = document.getElementById('sel-meses')?.value || 'TODOS';
+  // Usar aba 16 como referência temporal (mais completa)
+  const all = [...new Set(getInad16().map(r => r.ano_mes))].sort();
+  return all.filter(m => {
+    const [a,mo] = m.split('-');
+    if (ano !== 'TODOS' && a !== ano) return false;
+    if (mesF !== 'TODOS' && String(parseInt(mo)) !== mesF) return false;
+    return true;
+  });
+}
+
+// ─── agregado previsto/recebido/em_aberto (aba 16/16c) ─────────
+function aggInad(mes, s) {
+  const f = SEG_FONTE[s || seg];
+  const rows = (f.aba === '16c' ? getInad16c() : getInad16())
+    .filter(r => String(r.ano_mes) === String(mes) && f.valores.includes(r[f.campo]));
+  if (!rows.length) return null;
+  const prev = rows.reduce((a,r)=>a+(r.vl_previsto||0),0);
+  const recMraw = rows.reduce((a,r)=>a+(r.vl_rec_no_mes||0),0);
+  const recAraw = rows.reduce((a,r)=>a+(r.vl_rec_ano_vigente||0),0);
+  const recOraw = rows.reduce((a,r)=>a+(r.vl_rec_outro_ano||0),0);
+  const abFec = rows.reduce((a,r)=>a+(r.vl_em_aberto_fechamento||0),0);
+  const abHoj = rows.reduce((a,r)=>a+(r.vl_em_aberto_hoje||0),0);
+
+  // Segurança visual: os buckets de recebimento não podem ultrapassar o previsto.
+  // A correção principal está no Apps Script: usar valor-base da parcela, não valor líquido agrupado.
+  let recM = Math.min(recMraw, prev);
+  let recA = Math.min(recAraw, Math.max(prev - recM, 0));
+  let recO = Math.min(recOraw, Math.max(prev - recM - recA, 0));
+
+  const recTotal = prev - abHoj;  // recebido_total = previsto - em_aberto_hoje
+  return {
+    previsto:     r2(prev),
+    recNoMes:     r2(recM),
+    recAnoVig:    r2(recA),
+    recOutroAno:  r2(recO),
+    recTotal:     r2(recTotal),
+    emAbertoFec:  r2(abFec),
+    emAbertoHoje: r2(abHoj),
+    pctInadFec:   prev ? r2(abFec/prev*100) : 0,
+    pctInadHoje:  prev ? r2(abHoj/prev*100) : 0,
+    pctPagoMes:   prev ? r2(recM/prev*100) : 0,
+    pctReal:      prev ? r2(recTotal/prev*100) : 0,
+  };
+}
+
+// ─── inadimplência anual progressiva (aba 16b / 16c acumulada) ──
+function getAFim(mesesArr, s) {
+  // Inadimplência acumulada progressiva:
+  // mês X = em aberto até o último dia do mês X / previsto acumulado jan..X.
+  // Essa base vem da inadimplenciaAnualProg gerada no Apps Script.
+  const f = SEG_FONTE[s || seg];
+  const valores = f.valores;
+  const byMes = {};
+
+  getInad16b().filter(r => valores.includes(r.tipo_debito)).forEach(r => {
+    if (!byMes[r.ano_mes]) byMes[r.ano_mes] = {prev:0, abFec:0};
+    byMes[r.ano_mes].prev  += r.vl_previsto_acum        || 0;
+    byMes[r.ano_mes].abFec += r.vl_em_aberto_fechamento || 0;
+  });
+
+  return mesesArr.map(m => {
+    const d = byMes[String(m)];
+    if (!d || !d.prev) return null;
+    return r2(d.abFec / d.prev * 100);
+  });
+}
+
+function getInadHojeAnual(ano, s) {
+  const f = SEG_FONTE[s || seg];
+  const valores = f.valores;
+  const rows = getInad16b().filter(r => r.ano === ano && valores.includes(r.tipo_debito));
+  if (!rows.length) return null;
+  const ultMes = rows.reduce((max,r) => r.mes > max ? r.mes : max, 0);
+  const ultR   = rows.filter(r => r.mes === ultMes);
+  const prev = ultR.reduce((a,r)=>a+(r.vl_previsto_acum||0),0);
+  const abH  = ultR.reduce((a,r)=>a+(r.vl_em_aberto_hoje||0),0);
+  return prev ? r2(abH/prev*100) : null;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════════
+
+function render() {
+  if (!D) return;
+  const meses   = getMeses();
+  const labels  = meses.map(fMes);
+  const cor     = SEG_COR[seg];
+  const lbl     = SEG_LABEL[seg];
+
+  // Arrays por mês
+  const agg     = meses.map(m => aggInad(m));
+  const aFim    = getAFim(meses);
+
+  // Arrays auxiliares para CONSOLIDADO e REGULAR
+  const aggReg  = meses.map(m => aggInad(m,'REGULAR'));
+  const aggKids = meses.map(m => aggInad(m,'KIDS'));
+  const aggEI   = meses.map(m => aggInad(m,'EI'));
+  const aggEF   = meses.map(m => aggInad(m,'EF'));
+
+  const gv = (arr,fn,d=0) => arr.map(r => r!=null ? fn(r) : d);
+  const g  = (arr,fn,d=null) => arr.map(r => r!=null ? fn(r) : d);
+
+  // ── KPIs ──────────────────────────────────────────────────────
+  let tP=0,tRecTotal=0,tRecMes=0,tRecAno=0,tRecOut=0,tAbFec=0,tAbHoj=0;
+  let sReal=0,sPrazo=0,sInadFec=0,sInadHoj=0,c=0;
+  agg.forEach(r=>{
+    if(!r) return;
+    tP+=r.previsto; tRecTotal+=r.recTotal; tRecMes+=r.recNoMes;
+    tRecAno+=r.recAnoVig; tRecOut+=r.recOutroAno;
+    tAbFec+=r.emAbertoFec; tAbHoj+=r.emAbertoHoje;
+    sReal+=r.pctReal; sPrazo+=r.pctPagoMes; sInadFec+=r.pctInadFec; sInadHoj+=r.pctInadHoje;
+    c++;
+  });
+  const av = v => c ? r2(v/c) : 0;
+  const ultFim = [...aFim].reverse().find(v=>v!=null) ?? null;
+  const anoAtual = meses.length ? parseInt(meses[meses.length-1].slice(0,4)) : 0;
+  const inadHojeKPI = anoAtual ? getInadHojeAnual(anoAtual) : null;
+
+  const isEIEF = seg==='EI'||seg==='EF';
+  const noteEIEF = isEIEF ? ' ★' : '';
+
+  document.getElementById('kpi-strip').innerHTML = [
+    {l:'Previsto Total',           v:fBRL(tP),          c:cor,            s:`${c} meses · ${lbl}${noteEIEF}`},
+    {l:'Recebido Total',           v:fBRL(tRecTotal),   c:'var(--green)', s:'previsto − em aberto hoje'},
+    {l:'Recebido no Mês',          v:fBRL(tRecMes),     c:'var(--accent)',s:'pago até o fim do mês'},
+    {l:'Recuperado (meses seg.)',  v:fBRL(tRecAno),     c:'#64748b',      s:'pago após o mês, mesmo ano'},
+    {l:'Outro Ano',                v:fBRL(tRecOut),     c:'#475569',      s:'pago após o ano de competência'},
+    {l:'Em Aberto Hoje',           v:fBRL(tAbHoj),      c:tAbHoj>0?'var(--yellow)':'var(--green)', s:'posição atual'},
+    {l:'% Realização (méd)',       v:fPct(av(sReal)),   c:clReal(av(sReal)), s:'recTotal/previsto'},
+    {l:'% Pago no Mês (méd)',      v:fPct(av(sPrazo)),  c:av(sPrazo)>=80?'var(--green)':'var(--yellow)', s:'meta 80%'},
+    {l:'% Inad. Fechamento (méd)', v:fPct(av(sInadFec)),c:clInad(av(sInadFec)), s:'no fechamento do mês'},
+    {l:'% Inad. Fim Ano',          v:ultFim!=null?fPct(ultFim):'—', c:clInad(ultFim), s:'acumulado progressivo'},
+    {l:'% Inad. Hoje',             v:inadHojeKPI!=null?fPct(inadHojeKPI):'—', c:clInad(inadHojeKPI), s:'posição atual no ano'},
+  ].map(k=>`<div class="kpi-card">
+    <div class="kpi-label">${k.l}</div>
+    <div class="kpi-value" style="color:${k.c}">${k.v}</div>
+    <div class="kpi-sub">${k.s}</div>
+  </div>`).join('');
+
+  // ── CHART 1: Previsto × Recebido (dividido em 3 colunas) ────
+  const note1 = isEIEF ? '★ estimado via split proporcional (aba 15)' : '';
+  document.getElementById('chart1-note').textContent = note1;
+
+  mkChart('chart-prevrec', buildChart1(meses, labels, agg, aggReg, aggKids, aggEI, aggEF, gv));
+
+  // ── CHART 2: % Realização Mensal ────────────────────────────
+  const dsReal = [];
+  if (seg==='CONSOLIDADO') {
+    dsReal.push(
+      {label:'% Regular', data:g(aggReg, r=>r.pctReal), borderColor:'#4f7cff', bg:'rgba(79,124,255,.07)', fill:true, tension:.3, pointRadius:3, bw:2},
+      {label:'% Kids',    data:g(aggKids,r=>r.pctReal), borderColor:'#22d3ee', bg:'rgba(34,211,238,.06)', fill:true, tension:.3, pointRadius:3, bw:2}
+    );
+  } else {
+    // REGULAR, EI, EF, KIDS — linha única do segmento selecionado
+    dsReal.push({label:`% Realização (${lbl})`, data:g(agg,r=>r.pctReal), borderColor:cor, backgroundColor:hex2rgba(cor,.08), fill:true, tension:.3, pointRadius:3, borderWidth:2});
+  }
+  dsReal.push({label:'Meta 95%', data:meses.map(()=>95), borderColor:'rgba(251,191,36,.4)', borderDash:[4,3], pointRadius:0, borderWidth:1.5, fill:false});
+  mkChart('chart-realizacao',{type:'line', data:{labels, datasets:dsReal.map(fixDs)}, options:lineOpts(true)});
+
+  // ── CHART 3: Três Cortes ────────────────────────────────────
+  mkChart('chart-trescortes',{type:'line', data:{labels, datasets:[
+    {label:'Inad. Fechamento',  data:g(agg,r=>r.pctInadFec), borderColor:'#fbbf24', backgroundColor:'rgba(251,191,36,.06)', fill:true, tension:.3, pointRadius:3, borderWidth:2},
+    {label:'Inad. Fim do Ano',  data:aFim,                   borderColor:'#a78bfa', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:3, borderWidth:2, borderDash:[5,3]},
+    {label:'Inad. Hoje',        data:g(agg,r=>r.pctInadHoje),borderColor:'#34d399', backgroundColor:'rgba(52,211,153,.06)', fill:true, tension:.3, pointRadius:3, borderWidth:2},
+  ].map(fixDs)}, options:lineOpts(true)});
+
+  // ── CHART 4: % Pago no Prazo ────────────────────────────────
+  const dsPrazo = [];
+  if (seg==='CONSOLIDADO') {
+    dsPrazo.push(
+      {label:'% Regular', data:g(aggReg, r=>r.pctPagoMes), borderColor:'#4f7cff', backgroundColor:'transparent', tension:.3, pointRadius:3, borderWidth:2},
+      {label:'% Kids',    data:g(aggKids,r=>r.pctPagoMes), borderColor:'#22d3ee', backgroundColor:'transparent', borderDash:[4,2], tension:.3, pointRadius:3, borderWidth:2}
+    );
+  } else {
+    // REGULAR, EI, EF, KIDS — linha única do segmento selecionado
+    dsPrazo.push({label:`% Pago no Mês (${lbl})`, data:g(agg,r=>r.pctPagoMes), borderColor:cor, backgroundColor:hex2rgba(cor,.08), fill:true, tension:.3, pointRadius:3, borderWidth:2});
+  }
+  dsPrazo.push({label:'Meta 80%', data:meses.map(()=>80), borderColor:'rgba(251,191,36,.4)', borderDash:[4,3], pointRadius:0, borderWidth:1.5, fill:false});
+  mkChart('chart-prazo',{type:'line', data:{labels, datasets:dsPrazo.map(fixDs)}, options:lineOpts(true)});
+
+  // ── CHART 5: Recuperação Pós-Fechamento ─────────────────────
+  const recD = meses.map((_,i)=>{
+    const f=agg[i]?.pctInadFec, h=agg[i]?.pctInadHoje;
+    return (f!=null&&h!=null) ? r2(f-h) : null;
+  });
+  mkChart('chart-recuperacao',{type:'bar', data:{labels, datasets:[{
+    label:'Δ Fec→Hoje (pp)', data:recD,
+    backgroundColor:recD.map(v=>v==null?'rgba(107,114,128,.2)':v>=0?'rgba(52,211,153,.45)':'rgba(248,113,113,.35)'),
+    borderColor:recD.map(v=>v==null?'#6b7280':v>=0?'#34d399':'#f87171'),
+    borderWidth:1, borderRadius:3
+  }]}, options:{...barOpts(), scales:{...barOpts().scales, y:{...barOpts().scales.y, ticks:{...barOpts().scales.y.ticks, callback:v=>v+'pp'}}}}});
+
+  // ── TABELA ──────────────────────────────────────────────────
+  let extraTh = '';
+  if (seg==='CONSOLIDADO') extraTh = `<th style="color:#4f7cff">Reg Previsto</th><th style="color:#22d3ee">Kids Previsto</th><th style="color:#4f7cff">Reg No Mês</th><th style="color:#22d3ee">Kids No Mês</th>`;
+
+
+  document.getElementById('thead-row').innerHTML =
+    `<th>Mês</th>
+     <th>Previsto</th>${extraTh}
+     <th>Rec. no Mês</th>
+     <th>Rec. Ano Seg.</th>
+     <th>Rec. Outro Ano</th>
+     <th>Em Aberto Hj</th>
+     <th>% Real.</th>
+     <th>% Pago Mês</th>
+     <th style="color:var(--yellow)">% Inad Fec.</th>
+     <th style="color:var(--purple)">% Inad Fim Ano</th>
+     <th style="color:var(--green)">% Inad Hoje</th>
+     <th>Δ Fec→Hj</th>`;
+
+  let anoAt=null, rows='';
+  let _tP=0,_tRTotal=0,_tRMes=0,_tRAno=0,_tROut=0,_tAbHoj=0;
+  let _sReal=0,_sPrazo=0,_sInadFec=0,_sInadHoj=0,_c=0;
+
+  meses.forEach((m,i)=>{
+    const r = agg[i];
+    const ano = String(m).slice(0,4);
+    if (ano !== anoAt) {
+      anoAt = ano;
+      rows += `<tr class="yr-row"><td colspan="99">◆ ${ano}</td></tr>`;
+    }
+    if (!r) {
+      rows += `<tr><td>${fMes(m)}</td><td colspan="99" style="text-align:center;color:var(--muted);font-size:11px">sem dados</td></tr>`;
+      return;
+    }
+    _tP+=r.previsto; _tRTotal+=r.recTotal; _tRMes+=r.recNoMes;
+    _tRAno+=r.recAnoVig; _tROut+=r.recOutroAno; _tAbHoj+=r.emAbertoHoje;
+    _sReal+=r.pctReal; _sPrazo+=r.pctPagoMes; _sInadFec+=r.pctInadFec; _sInadHoj+=r.pctInadHoje;
+    _c++;
+
+    const fim = aFim[i];
+    const delta = recD[i];
+    let extTd = '';
+    if (seg==='CONSOLIDADO') extTd = `
+      <td style="color:#4f7cff">${aggReg[i]?fBRL(aggReg[i].previsto):'—'}</td>
+      <td style="color:#22d3ee">${aggKids[i]?fBRL(aggKids[i].previsto):'—'}</td>
+      <td style="color:#4f7cff">${aggReg[i]?fBRL(aggReg[i].recNoMes):'—'}</td>
+      <td style="color:#22d3ee">${aggKids[i]?fBRL(aggKids[i].recNoMes):'—'}</td>`;
+
+
+    rows += `<tr>
+      <td>${fMes(m)}</td>
+      <td style="color:#4f7cff;font-weight:600">${fBRL(r.previsto)}</td>${extTd}
+      <td style="color:var(--accent)">${fBRL(r.recNoMes)}</td>
+      <td style="color:#64748b">${fBRL(r.recAnoVig)}</td>
+      <td style="color:#475569">${fBRL(r.recOutroAno)}</td>
+      <td style="color:${r.emAbertoHoje>0?'var(--yellow)':'var(--muted)'}">${fBRL(r.emAbertoHoje)}</td>
+      <td style="color:${clReal(r.pctReal)};font-weight:600">${fPct(r.pctReal)}</td>
+      <td style="color:${r.pctPagoMes>=80?'var(--green)':'var(--yellow)'}">${fPct(r.pctPagoMes)}</td>
+      <td style="color:${clInad(r.pctInadFec)};font-weight:600">${fPct(r.pctInadFec)}</td>
+      <td style="color:${clInad(fim)}">${fim!=null?fPct(fim):'—'}</td>
+      <td style="color:${clInad(r.pctInadHoje)};font-weight:600">${fPct(r.pctInadHoje)}</td>
+      <td style="color:${delta==null?'var(--muted)':delta>=0?'var(--green)':'var(--red)'}">${delta!=null?fPct(delta)+' pp':'—'}</td>
+    </tr>`;
+  });
+  document.getElementById('tbody-historico').innerHTML = rows;
+
+  const av2 = v => _c ? r2(v/_c) : 0;
+  let extFoot = '';
+  if (seg==='CONSOLIDADO') extFoot = `
+    <td style="color:#4f7cff">${fBRL(aggReg.reduce((s,r)=>s+(r?.previsto||0),0))}</td>
+    <td style="color:#22d3ee">${fBRL(aggKids.reduce((s,r)=>s+(r?.previsto||0),0))}</td>
+    <td style="color:#4f7cff">${fBRL(aggReg.reduce((s,r)=>s+(r?.recNoMes||0),0))}</td>
+    <td style="color:#22d3ee">${fBRL(aggKids.reduce((s,r)=>s+(r?.recNoMes||0),0))}</td>`;
+
+
+  document.getElementById('tfoot-row').innerHTML = `
+    <td>Total / Média (${_c} meses)</td>
+    <td style="color:#4f7cff">${fBRL(_tP)}</td>${extFoot}
+    <td style="color:var(--accent)">${fBRL(_tRMes)}</td>
+    <td style="color:#64748b">${fBRL(_tRAno)}</td>
+    <td style="color:#475569">${fBRL(_tROut)}</td>
+    <td style="color:var(--yellow)">${fBRL(_tAbHoj)}</td>
+    <td style="color:${clReal(av2(_sReal))}">${fPct(av2(_sReal))}</td>
+    <td>${fPct(av2(_sPrazo))}</td>
+    <td style="color:var(--yellow);font-weight:700">${fPct(av2(_sInadFec))}</td>
+    <td style="color:var(--purple)">${ultFim!=null?fPct(ultFim):'—'}</td>
+    <td style="color:var(--green);font-weight:700">${inadHojeKPI!=null?fPct(inadHojeKPI):'—'}</td>
+    <td></td>`;
+
+  // ── Insights ────────────────────────────────────────────────
+  if (_c > 0) {
+    const bst = agg.reduce((b,r,i)=>r&&(b===null||r.pctReal>agg[b].pctReal)?i:b, null);
+    const wst = agg.reduce((b,r,i)=>r&&(b===null||r.pctReal<agg[b].pctReal)?i:b, null);
+    const recPerdido = r2(_tP - _tRMes - _tRAno - _tROut - _tAbHoj); // emAbertoFec historico
+    document.getElementById('insights-bar').innerHTML = [
+      {icon:'📌', text:`Melhor mês: <strong>${bst!=null?fMes(meses[bst]):'—'}</strong> (${bst!=null?fPct(agg[bst].pctReal):'—'}). Pior: <strong>${wst!=null?fMes(meses[wst]):'—'}</strong> (${wst!=null?fPct(agg[wst].pctReal):'—'}).`},
+      {icon:'💰', text:`Inad. média no fechamento: <strong>${fPct(av2(_sInadFec))}</strong>. Fim do ano acumulado: <strong>${ultFim!=null?fPct(ultFim):'—'}</strong>. Posição hoje: <strong>${inadHojeKPI!=null?fPct(inadHojeKPI):'—'}</strong>. Recuperação média: ${fPct(r2(av2(_sInadFec)-av2(_sInadHoj)))} pp/mês.`},
+      {icon:'💡', text:`Recebido até o fechamento do mês de competência: <strong>${fBRL(_tRMes)}</strong>. Recuperado nos meses seguintes, dentro do mesmo ano: <strong style="color:var(--muted)">${fBRL(_tRAno)}</strong>. Recebido após o ano de competência: <strong style="color:#475569">${fBRL(_tROut)}</strong>. Ainda em aberto: <strong style="color:var(--yellow)">${fBRL(_tAbHoj)}</strong>.`},
+    ].map(it=>`<div class="ins-item"><span class="icon">${it.icon}</span><span>${it.text}</span></div>`).join('');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CHART 1 — lógica separada (stacked bars com 3 colunas)
+// ═══════════════════════════════════════════════════════════════════
+function buildChart1(meses, labels, agg, aggReg, aggKids, aggEI, aggEF, gv) {
+  const ds = [];
+  const bOp = {borderRadius:3, borderWidth:1};
+
+  if (seg === 'CONSOLIDADO') {
+    // Previsto: Regular | Kids
+    // Recebido no Mês: Regular | Kids
+    // Em Aberto: total
+    ds.push(
+      {label:'Reg — Previsto',    data:gv(aggReg, r=>r.previsto),   backgroundColor:'rgba(79,124,255,.45)', borderColor:'#4f7cff', ...bOp, stack:'prev'},
+      {label:'Kids — Previsto',   data:gv(aggKids,r=>r.previsto),   backgroundColor:'rgba(34,211,238,.45)', borderColor:'#22d3ee', ...bOp, stack:'prev'},
+      {label:'Reg — No Mês',      data:gv(aggReg, r=>r.recNoMes),   backgroundColor:'rgba(79,124,255,.7)',  borderColor:'#4f7cff', ...bOp, stack:'rec'},
+      {label:'Kids — No Mês',     data:gv(aggKids,r=>r.recNoMes),   backgroundColor:'rgba(34,211,238,.7)',  borderColor:'#22d3ee', ...bOp, stack:'rec'},
+      {label:'Reg — Rec. Seg.',   data:gv(aggReg, r=>r.recAnoVig),  backgroundColor:'rgba(79,124,255,.35)', borderColor:'#4f7cff', ...bOp, stack:'rec'},
+      {label:'Kids — Rec. Seg.',  data:gv(aggKids,r=>r.recAnoVig),  backgroundColor:'rgba(34,211,238,.35)', borderColor:'#22d3ee', ...bOp, stack:'rec'},
+      {label:'Em Aberto',         data:gv(agg,    r=>r.emAbertoHoje),backgroundColor:'rgba(251,191,36,.45)',borderColor:'#fbbf24', ...bOp, stack:'ab'},
+    );
+  } else {
+    const c6 = hex2rgba(SEG_COR[seg],.6), c3 = hex2rgba(SEG_COR[seg],.3);
+    ds.push(
+      {label:'Previsto',         data:gv(agg,r=>r.previsto),    backgroundColor:hex2rgba(SEG_COR[seg],.4),  borderColor:SEG_COR[seg], ...bOp, stack:'prev'},
+      {label:'Rec. no Mês',      data:gv(agg,r=>r.recNoMes),    backgroundColor:c6,                         borderColor:SEG_COR[seg], ...bOp, stack:'rec'},
+      {label:'Rec. Meses Seg.',  data:gv(agg,r=>r.recAnoVig),   backgroundColor:c3,                         borderColor:SEG_COR[seg], ...bOp, stack:'rec'},
+      {label:'Rec. Outro Ano',   data:gv(agg,r=>r.recOutroAno), backgroundColor:'rgba(100,116,139,.4)',      borderColor:'#64748b',    ...bOp, stack:'rec'},
+      {label:'Em Aberto Hoje',   data:gv(agg,r=>r.emAbertoHoje),backgroundColor:'rgba(251,191,36,.45)',      borderColor:'#fbbf24',    ...bOp, stack:'ab'},
+    );
+  }
+
+  return {
+    type:'bar',
+    data:{ labels, datasets: ds.map(fixDs) },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{labels:{color:'#9ca3af',font:{family:'DM Sans',size:10},boxWidth:10,padding:8}},
+        tooltip:{backgroundColor:'#1a1e2a',borderColor:'#252b3b',borderWidth:1,titleColor:'#e8eaf0',bodyColor:'#9ca3af',padding:10}
+      },
+      scales:{
+        x:{stacked:false, grid:{color:'rgba(255,255,255,.03)'}, ticks:{color:'#6b7290',font:{family:'DM Mono',size:9},maxRotation:45,autoSkip:true,maxTicksLimit:24}},
+        y:{stacked:false, grid:{color:'rgba(255,255,255,.04)'}, ticks:{color:'#6b7290',font:{family:'DM Mono',size:9},callback:v=>'R$'+(v/1000).toFixed(0)+'k'}}
+      }
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CHART HELPERS
+// ═══════════════════════════════════════════════════════════════════
+const TT = {backgroundColor:'#1a1e2a',borderColor:'#252b3b',borderWidth:1,titleColor:'#e8eaf0',bodyColor:'#9ca3af',padding:10};
+function mkChart(id, cfg) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  charts[id] = new Chart(ctx, cfg);
+}
+function fixDs(d) {
+  const out = {...d};
+  if (d.bg && !d.backgroundColor) out.backgroundColor = d.bg;
+  if (d.bw && !d.borderWidth) out.borderWidth = d.bw;
+  delete out.bg; delete out.bw;
+  return out;
+}
+function lineOpts(yPct=false) {
+  return {
+    responsive:true, maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{legend:{labels:{color:'#9ca3af',font:{family:'DM Sans',size:10},boxWidth:10,padding:8}},tooltip:TT},
+    scales:{
+      x:{grid:{color:'rgba(255,255,255,.03)'},ticks:{color:'#6b7290',font:{family:'DM Mono',size:9},maxRotation:45,autoSkip:true,maxTicksLimit:24}},
+      y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6b7290',font:{family:'DM Mono',size:9},callback:yPct?v=>v+'%':v=>'R$'+(v/1000).toFixed(0)+'k'},
+        ...(yPct?{min:0}:{})}
+    }
+  };
+}
+function barOpts() {
+  return {
+    responsive:true, maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{legend:{display:false},tooltip:TT},
+    scales:{
+      x:{grid:{display:false},ticks:{color:'#6b7290',font:{family:'DM Mono',size:9},maxRotation:45,autoSkip:true,maxTicksLimit:24}},
+      y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6b7290',font:{family:'DM Mono',size:9},callback:v=>'R$'+(v/1000).toFixed(0)+'k'}}
+    }
+  };
+}
+function hex2rgba(hex, a) {
+  const h = hex.replace('#','');
+  const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CONTROLES
+// ═══════════════════════════════════════════════════════════════════
+function setSeg(btn) {
+  document.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  seg = btn.dataset.seg;
+  const isEIEF = seg==='EI'||seg==='EF';
+  document.getElementById('seg-note').textContent = isEIEF ? '★ dados estimados via split proporcional (aba 15 — proporção anual EI/EF)' : '';
+  render();
+}
+function onFiltroChange() { render(); }
+
+// ═══════════════════════════════════════════════════════════════════
+// EXPORTAÇÕES
+// ═══════════════════════════════════════════════════════════════════
+function exportXLS() {
+  if (typeof XLSX === 'undefined') { alert('Biblioteca ainda carregando. Aguarde e tente novamente.'); return; }
+  const table = document.getElementById('table-historico');
+  if (!table) return;
+  const ano = document.getElementById('sel-ano')?.value || 'TODOS';
+  const nomeArq = `Historico_Mensal_${(SEG_LABEL[seg]||seg).replace(/[^a-zA-Z0-9_-]/g,'_')}_${ano}.xlsx`;
+  const heads = [...table.querySelectorAll('thead tr th')].map(th=>th.innerText.trim());
+  const dataRows = [];
+  table.querySelectorAll('tbody tr').forEach(tr=>{
+    const tds = tr.querySelectorAll('td');
+    if (tds.length <= 1) return;
+    dataRows.push([...tds].map(td=>td.innerText.trim()));
+  });
+  const foot = [...(table.querySelector('tfoot tr')?.querySelectorAll('td')||[])].map(td=>td.innerText.trim());
+  const sheetData = [
+    [`Histórico Mensal — ${SEG_LABEL[seg]||seg} | Ano: ${ano}`],
+    [`Colégio Einstein Palmas · Gerado em ${new Date().toLocaleString('pt-BR')}`],
+    [],
+    heads,
+    ...dataRows,
+    [],
+    ...(foot.length ? [foot] : [])
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  ws['!cols'] = heads.map((_,i)=>({wch: i===0?12:16}));
+  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:heads.length-1}},{s:{r:1,c:0},e:{r:1,c:heads.length-1}}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Histórico Mensal');
+  XLSX.writeFile(wb, nomeArq);
+}
+
+function exportPDF() {
+  const table = document.getElementById('table-historico');
+  if (!table) return;
+  const ano    = document.getElementById('sel-ano')?.value || 'TODOS';
+  const titulo = `Histórico Mensal — ${SEG_LABEL[seg]||seg} | Ano: ${ano}`;
+  const clone  = table.cloneNode(true);
+  clone.querySelectorAll('th,td').forEach(el=>{ el.style.color=''; el.style.fontWeight=''; });
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titulo}</title>
+<style>
+  body{font-family:Arial,sans-serif;font-size:9px;color:#111;padding:20px}
+  h2{font-size:13px;color:#1a237e;margin-bottom:4px}
+  p{font-size:8px;color:#666;margin-bottom:12px}
+  table{width:100%;border-collapse:collapse}
+  thead th{background:#1a237e;color:#fff;padding:5px 6px;font-size:8px;text-align:right;border:1px solid #1a237e;white-space:nowrap}
+  thead th:first-child{text-align:left}
+  tbody tr:nth-child(even){background:#f5f5ff}
+  tbody td{padding:4px 6px;border:1px solid #ddd;font-size:8px;text-align:right;font-family:'Courier New',monospace;white-space:nowrap}
+  tbody td:first-child{text-align:left;font-family:Arial,sans-serif}
+  tfoot td{background:#e8f5e9;font-weight:700;padding:5px 6px;border:1px solid #ccc;font-size:8px;text-align:right}
+  tfoot td:first-child{text-align:left}
+</style></head><body>
+<h2>${titulo}</h2>
+<p>Colégio Einstein Palmas · Gerado em ${new Date().toLocaleString('pt-BR')}</p>
+${clone.outerHTML}
+</body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(), 400);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CARREGAMENTO DE DADOS
+// ═══════════════════════════════════════════════════════════════════
+
+function isInsideGAS() {
+  try { return typeof google !== 'undefined' && google.script && google.script.run; } catch(_) { return false; }
+}
+
+async function carregarJSON() {
+  if (isInsideGAS()) {
+    // Dentro do GAS como Web App — sem CORS, usa google.script.run
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(json => {
+          try {
+            const parsed = typeof json === 'string' ? JSON.parse(json) : json;
+            if (!parsed || !parsed.inadimplenciaMensal) reject(new Error('JSON incompleto — rode gerarJSONAlunos() primeiro.'));
+            else resolve(parsed);
+          } catch(e) { reject(new Error('JSON inválido: ' + e.message)); }
+        })
+        .withFailureHandler(e => reject(new Error('GAS erro: ' + e.message)))
+        .getDadosAlunos();
+    });
+  }
+  // file:// ou domínio externo — fetch via GAS Web App (?action=data)
+  // O GAS publica com Access-Control-Allow-Origin: * → sem CORS
+  let text;
+  try {
+    const resp = await fetch(JSON_URL);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ao buscar ' + JSON_URL);
+    text = await resp.text();
+    const parsed = JSON.parse(text);
+    if (!parsed || !parsed.inadimplenciaMensal) throw new Error('JSON incompleto — rode gerarJSONAlunos() primeiro.');
+    return parsed;
+  } catch(e) {
+    if (text && text.length < 300) throw new Error(e.message + ' | Resposta: ' + text);
+    throw e;
+  }
+}
+
+async function loadData() {
+  setStatus('carregando…', false);
+  document.getElementById('loading-overlay').classList.remove('hidden');
+  try {
+    D = await carregarJSON();
+
+    // Popular select de anos
+    const anos = [...new Set(
+      (D.inadimplenciaMensal||[]).map(r=>String(r.ano))
+    )].sort();
+    const selAno = document.getElementById('sel-ano');
+    selAno.innerHTML = '<option value="TODOS">Todos os anos</option>' +
+      anos.map(a=>`<option value="${a}">${a}</option>`).join('');
+    // Selecionar o último ano por default
+    if (anos.length) selAno.value = anos[anos.length-1];
+
+    document.getElementById('status-ts').textContent =
+      'gerado em ' + new Date(D.geradoEm||Date.now()).toLocaleString('pt-BR');
+    setStatus('dados carregados — ' + (D.inadimplenciaMensal?.length||0) + ' registros', true);
+    document.getElementById('loading-overlay').classList.add('hidden');
+    document.getElementById('app-shell').classList.remove('hidden');
+    initInadSelects();
+    render();
+  } catch(e) {
+    setStatus('erro: ' + e.message, false, true);
+    document.getElementById('loading-overlay').classList.add('hidden');
+    document.getElementById('app-shell').classList.remove('hidden');
+    console.error('loadData erro:', e);
+  }
+}
+
+function setStatus(txt, ok=false, err=false) {
+  const dot = document.getElementById('status-dot');
+  const msg = document.getElementById('status-txt');
+  dot.className = 'status-dot' + (ok?' ok':err?' err':'');
+  msg.textContent = txt;
+}
+
+loadData();
+
+function brl(v){ return 'R$ ' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function brlK(v){ v=v||0; if(Math.abs(v)>=1e6) return 'R$ '+(v/1e6).toFixed(2).replace('.',',')+' Mi'; if(Math.abs(v)>=1e3) return 'R$ '+(v/1e3).toFixed(1).replace('.',',')+' Mil'; return brl(v); }
+function pctFmt(v){ return ((v||0)*100).toFixed(1)+'%'; }
+function riskColor(r){ return r==='RISCO CRITICO'?'var(--red)':r==='RISCO ALTO'?'var(--orange)':r==='RISCO MEDIO'?'var(--yellow)':r==='RISCO BAIXO'?'var(--cyan)':'var(--green)'; }
+
+function kpiCard(label,val,sub,color){ return `<div class="kpi-card"><div class="kpi-value" style="color:${color||'var(--text)'}">${val}</div><div class="kpi-label">${label}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`; }
+
+const sortState = {};
+function sortTable(id, col) {
+  const table = document.getElementById(id);
+  if (!table) return;
+  const tbodyEl = table.querySelector('tbody');
+  const rows    = Array.from(tbodyEl.querySelectorAll('tr'));
+  const ths     = table.querySelectorAll('thead th');
+  const key     = id + '_' + col;
+  sortState[key] = sortState[key] === 'asc' ? 'desc' : 'asc';
+  ths.forEach(th => th.classList.remove('sort-asc','sort-desc'));
+  if (ths[col]) ths[col].classList.add(sortState[key] === 'asc' ? 'sort-asc' : 'sort-desc');
+  rows.sort((a, b) => {
+    const va = (a.cells[col] ? a.cells[col].textContent.trim().replace(/[R$%,. ]/g,'') : '');
+    const vb = (b.cells[col] ? b.cells[col].textContent.trim().replace(/[R$%,. ]/g,'') : '');
+    const na = parseFloat(va), nb = parseFloat(vb);
+    const cmp = !isNaN(na) && !isNaN(nb) ? na - nb : va.localeCompare(vb, 'pt-BR');
+    return sortState[key] === 'asc' ? cmp : -cmp;
+  });
+  rows.forEach(r => tbodyEl.appendChild(r));
+}
+
+
+// ── Navegação sidebar ─────────────────────────────────────────────
+const VIEW_TITLES_NAV = {
+  'hist-mensal':       'Receita · Histórico Mensal',
+  'inad-visao-geral':  'Inadimplência · Visão Geral',
+  'inad-mensal':       'Inadimplência · Fechamento Mensal',
+  'inad-turma':        'Inadimplência · Por Turma',
+  'inad-aluno':        'Inadimplência · Por Aluno',
+  'inad-concentracao': 'Inadimplência · Concentração (Pareto)',
+};
+document.querySelectorAll('.nav-item').forEach(function(item) {
+  item.addEventListener('click', function() {
+    document.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('active'); });
+    document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
+    item.classList.add('active');
+    var view = item.dataset.view;
+    var el = document.getElementById('view-' + view);
+    if (el) el.classList.add('active');
+    var titleEl = document.getElementById('view-page-title');
+    if (titleEl) {
+      var t = VIEW_TITLES_NAV[view] || view;
+      var parts = t.split(' · ');
+      titleEl.innerHTML = parts.length > 1 ? parts[0] + ' · <em>' + parts[1] + '</em>' : '<em>' + t + '</em>';
+    }
+    if (view === 'inad-visao-geral')  renderInadVisaoGeral();
+    if (view === 'inad-mensal')       renderInadMensalSetup();
+    if (view === 'inad-turma')        renderInadTurmaSetup();
+    if (view === 'inad-aluno')        renderInadAlunoSetup();
+    if (view === 'inad-concentracao') renderInadConcentracao();
+  });
+});
+
+
+function buildContexto(viewId) {
+  var ctx = { view: viewId };
+  if (viewId === 'inad-mensal') {
+    var ano  = (document.getElementById('sel-ano-inad-mensal')  || {}).value || '';
+    var tipo = (document.getElementById('sel-tipo-inad-mensal') || {}).value || '';
+    var rows = D.inadimplenciaMensal || [];
+    if (ano)  rows = rows.filter(function(r){ return String(r.ano)===ano; });
+    if (tipo) rows = rows.filter(function(r){ return r.tipo_debito===tipo; });
+    ctx.dados = rows.slice(0,60);
+  } else if (viewId === 'inad-turma') {
+    var ano  = (document.getElementById('sel-ano-inad-turma')  || {}).value || '';
+    var tipo = (document.getElementById('sel-tipo-inad-turma') || {}).value || '';
+    var rows = D.inadimplenciaTurma || [];
+    if (ano)  rows = rows.filter(function(r){ return String(r.ano)===ano; });
+    if (tipo) rows = rows.filter(function(r){ return r.tipo_debito===tipo; });
+    ctx.dados = rows.slice(0,40);
+  } else if (viewId === 'inad-aluno') {
+    ctx.dados = (D.inadimplenciaAluno||[]).filter(function(r){ return r.vl_em_aberto>0; }).slice(0,30);
+  } else if (viewId === 'inad-concentracao') {
+    ctx.dados = (D.inadimplenciaConcentracao||[]).slice(0,30);
+  } else if (viewId === 'inad-visao-geral') {
+    ctx.inadimplenciaAnual = D.inadimplenciaAnual || {};
+    ctx.concentracao_count = (D.inadimplenciaConcentracao||[]).length;
+  }
+  return ctx;
+}
+
+
+var VIEW_PROMPTS_INAD = {
+  'hist-mensal':       'Você é um CFO especialista em gestão escolar analisando o histórico mensal de receita e inadimplência do Colégio Einstein em Palmas-TO (2017–2026). Analise: evolução, meses críticos, split EI/EF/KIDS, taxa de recuperação pós-fechamento e recomendações. 4–5 parágrafos.',
+  'inad-visao-geral':  'Você é um CFO especialista analisando a inadimplência histórica do Colégio Einstein. Analise: evolução do saldo em aberto por ano, % inadimplência sobre base, impacto financeiro e ações prioritárias de cobrança. 4–5 parágrafos.',
+  'inad-mensal':       'Você é um CFO analisando o fechamento mensal de inadimplência do Colégio Einstein. Identifique: meses com maior inadimplência, sazonalidade, padrão entre REGULAR e KIDS, e recomendações de timing para ações de cobrança. 4–5 parágrafos.',
+  'inad-turma':        'Você é um CFO analisando inadimplência por turma do Colégio Einstein. Identifique: turmas críticas, padrões por série, anos com pior desempenho e recomendações de ação direcionada por turma. 4–5 parágrafos.',
+  'inad-aluno':        'Você é um CFO analisando o perfil de inadimplência por aluno do Colégio Einstein. Analise: distribuição por classificação de risco, perfil típico do inadimplente crítico, tempo médio de atraso e estratégia de abordagem diferenciada. 4–5 parágrafos.',
+  'inad-concentracao': 'Você é um CFO analisando a concentração de inadimplência (Pareto) do Colégio Einstein. Identifique: quantos alunos representam 80% da dívida, valor potencial de recuperação prioritária, perfil dos maiores devedores e plano de ação focado. 4–5 parágrafos.',
+};
+
+
+async function chamarIA(viewId) {
+  var btn    = document.getElementById('btn-ia-'  + viewId);
+  var respEl = document.getElementById('ia-resp-' + viewId);
+  var textEl = document.getElementById('ia-text-' + viewId);
+  if (!btn || !respEl || !textEl) return;
+  btn.disabled = true;
+  btn.classList.add('loading');
+  respEl.classList.add('visible');
+  textEl.innerHTML = '<span class="ia-cursor"></span>';
+  var ctx    = buildContexto(viewId);
+  var prompt = VIEW_PROMPTS_INAD[viewId] || '';
+  try {
+    var texto = '';
+    if (isInsideGAS()) {
+      texto = await new Promise(function(res, rej) {
+        google.script.run
+          .withSuccessHandler(function(r) { if(r&&r.erro) rej(new Error(r.erro)); else res((r&&r.texto)||r||''); })
+          .withFailureHandler(function(e) { rej(new Error(e.message)); })
+          .chamarGASGroq(prompt, JSON.stringify(ctx));
+      });
+    } else {
+      var response = await fetch(GAS_URL + '?action=gemini', {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain'},
+        body: JSON.stringify({action:'gemini', prompt: prompt, dados: JSON.stringify(ctx)})
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      var result = await response.json();
+      if (result.erro) throw new Error(result.erro);
+      texto = (result.texto || '').trim();
+    }
+    textEl.innerHTML = texto.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+  } catch(e) {
+    textEl.innerHTML = '<span style="color:var(--red)">Erro: ' + e.message + '</span>';
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+}
+
+
+function calcInsightsInadVisaoGeral() {
+  var anual = D.inadimplenciaAnual || {};
+  var anos  = Object.keys(anual).sort();
+  if (!anos.length) return [];
+  var ult    = anos[anos.length-1];
+  var totAb  = anos.reduce(function(s,a){ return s+(anual[a].vl_em_aberto||0); }, 0);
+  var totPrev= anos.reduce(function(s,a){ return s+(anual[a].vl_previsto||0); }, 0);
+  var pctUlt = anual[ult].vl_previsto ? anual[ult].vl_em_aberto/anual[ult].vl_previsto : 0;
+  return [
+    {icon:'🔴', text:'Saldo total em aberto: <strong style="color:var(--red)">'+brlK(totAb)+'</strong>'},
+    {icon:'📊', text:'% inadimplência sobre base total: <strong>'+pctFmt(totPrev?totAb/totPrev:0)+'</strong>'},
+    {icon:'📅', text:'Em '+ult+': <strong>'+pctFmt(pctUlt)+'</strong> de inadimplência ('+brlK(anual[ult].vl_em_aberto)+' em aberto)'},
+    {icon:'👤', text:'Alunos com saldo devedor atual: <strong>'+((D.inadimplenciaConcentracao||[]).length)+'</strong>'}
+  ];
+}
+function calcInsightsInadConcentracao() {
+  var rows = D.inadimplenciaConcentracao || [];
+  if (!rows.length) return [];
+  var total = rows.reduce(function(s,r){ return s+(r.vl_em_aberto||0); }, 0);
+  var acum=0, n80=0;
+  for (var i=0; i<rows.length; i++) { acum+=(rows[i].vl_em_aberto||0); n80++; if(acum>=total*0.8) break; }
+  return [
+    {icon:'🎯', text:'<strong>'+n80+' alunos</strong> concentram 80% da dívida'},
+    {icon:'🔴', text:'Maior devedor: <strong>'+(rows[0]?rows[0].aluno:'')+'</strong> — '+brlK(rows[0]?rows[0].vl_em_aberto:0)},
+    {icon:'📋', text:'Total de inadimplentes: <strong>'+rows.length+'</strong> alunos com saldo em aberto'},
+    {icon:'⚡',       text:'Recuperar top 20 = <strong>'+pctFmt(rows.slice(0,20).reduce(function(s,r){ return s+(r.pct_do_total||0); },0))+'</strong> do saldo total'}
+  ];
+}
+function renderInsightsInad(viewId) {
+  if (!D) return;
+  var fns = {'inad-visao-geral': calcInsightsInadVisaoGeral, 'inad-concentracao': calcInsightsInadConcentracao};
+  var fn = fns[viewId];
+  if (!fn) return;
+  try {
+    var items = fn();
+    var el = document.getElementById('ins-fixed-' + viewId);
+    if (el) el.innerHTML = items.map(function(i){ return '<div class="insight-item"><span class="insight-icon">'+i.icon+'</span><span>'+i.text+'</span></div>'; }).join('');
+  } catch(e) { console.warn('renderInsightsInad:', e); }
+}
+function renderInsights(viewId) { renderInsightsInad(viewId); }
+
+function renderInadVisaoGeral(){
+  if(!D?.inadimplenciaTurma) return;
+  const anual=D.inadimplenciaAnual||{};
+  const anos=Object.keys(anual).sort();
+  let tp=0,tv=0,tab=0,tqi=0;
+  anos.forEach(a=>{ tp+=anual[a].vl_previsto||0; tv+=anual[a].vl_recebido||0; tab+=anual[a].vl_em_aberto||0; tqi+=anual[a].qtd_inadimp||0; });
+  const pct=tp?tab/tp:0;
+
+  document.getElementById('kpi-inad-visao-geral').innerHTML =
+    kpiCard('Total em Aberto (atual)',brlK(tab),'mensalidades + kids','var(--red)') +
+    kpiCard('% Inadimplência',pctFmt(pct),'sobre previsto total','var(--orange)') +
+    kpiCard('Alunos Inadimplentes',tqi.toLocaleString('pt-BR'),'com parcela em aberto','var(--yellow)') +
+    kpiCard('Receita Prevista Base',brlK(tp),'mensalidades + kids','var(--muted)');
+
+  mkChart('chart-inad-anual',{type:'bar',data:{labels:anos,datasets:[{label:'Valor em Aberto',data:anos.map(a=>anual[a].vl_em_aberto||0),backgroundColor:anos.map(a=>{ const p=anual[a].vl_previsto; const r=anual[a].vl_em_aberto; return (p&&r/p>0.15)?'#f87171':'#fbbf24'; }),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6b7290'},grid:{display:false}},y:{ticks:{color:'#6b7290',callback:v=>brlK(v)},grid:{color:'rgba(255,255,255,.05)'}}}}});
+
+  mkChart('chart-inad-pct-anual',{type:'line',data:{labels:anos,datasets:[{label:'% Inadimplência',data:anos.map(a=>{ const p=anual[a].vl_previsto,ab=anual[a].vl_em_aberto; return p?Math.round(ab/p*1000)/10:0; }),borderColor:'#f87171',backgroundColor:'rgba(248,113,113,.1)',fill:true,tension:.3,pointRadius:5,pointBackgroundColor:'#f87171'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6b7290'},grid:{display:false}},y:{ticks:{color:'#6b7290',callback:v=>v+'%'},grid:{color:'rgba(255,255,255,.05)'}}}}});
+  renderInsights('inad-visao-geral');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INADIMPLÊNCIA | FECHAMENTO MENSAL
+// ═══════════════════════════════════════════════════════════════════
+function renderInadMensalSetup(){
+  if(!D?.inadimplenciaMensal) return;
+  const anos=[...new Set(D.inadimplenciaMensal.map(r=>r.ano))].sort();
+  const sel=document.getElementById('sel-ano-inad-mensal');
+  if(sel) sel.innerHTML='<option value="">Todos os anos</option>'+anos.map(a=>`<option>${a}</option>`).join('');
+  renderInadMensal();
+}
+function renderInadMensal(){
+  if(!D?.inadimplenciaMensal) return;
+  const ano=document.getElementById('sel-ano-inad-mensal')?.value||'';
+  const tipo=document.getElementById('sel-tipo-inad-mensal')?.value||'';
+  let rows=D.inadimplenciaMensal;
+  if(ano) rows=rows.filter(r=>String(r.ano)===ano);
+  if(tipo) rows=rows.filter(r=>r.tipo_debito===tipo);
+
+  // Agrupar por ano_mes
+  const m={};
+  rows.forEach(r=>{ if(!m[r.ano_mes]) m[r.ano_mes]={vp:0,va:0,vr:0}; m[r.ano_mes].vp+=r.vl_previsto||0; m[r.ano_mes].va+=r.vl_em_aberto_fechamento||0; m[r.ano_mes].vr+=r.vl_rec_no_mes||0; });
+  const labels=Object.keys(m).sort();
+  const pcts=labels.map(l=>m[l].vp?Math.round(m[l].va/m[l].vp*1000)/10:0);
+
+  mkChart('chart-inad-mensal-line',{type:'line',data:{labels,datasets:[{label:'% Inadimplência Fechamento',data:pcts,borderColor:'#f87171',backgroundColor:'rgba(248,113,113,.1)',fill:true,tension:.3,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6b7290',maxTicksLimit:24,maxRotation:45},grid:{display:false}},y:{ticks:{color:'#6b7290',callback:v=>v+'%'},grid:{color:'rgba(255,255,255,.05)'}}}}});
+
+  mkChart('chart-inad-mensal-bar',{type:'bar',data:{labels,datasets:[{label:'Em Aberto (R$)',data:labels.map(l=>m[l].va),backgroundColor:'rgba(248,113,113,.7)',borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6b7290',maxTicksLimit:24,maxRotation:45},grid:{display:false}},y:{ticks:{color:'#6b7290',callback:v=>brlK(v)},grid:{color:'rgba(255,255,255,.05)'}}}}});
+  renderInsights('inad-mensal');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INADIMPLÊNCIA | POR TURMA
+// ═══════════════════════════════════════════════════════════════════
+function renderInadTurmaSetup(){
+  if(!D?.inadimplenciaTurma) return;
+  const anos=[...new Set(D.inadimplenciaTurma.map(r=>r.ano))].sort();
+  const sel=document.getElementById('sel-ano-inad-turma');
+  if(sel) sel.innerHTML='<option value="">Todos os anos</option>'+anos.map(a=>`<option>${a}</option>`).join('');
+  renderInadTurma();
+}
+function renderInadTurma(){
+  if(!D?.inadimplenciaTurma) return;
+  const ano=document.getElementById('sel-ano-inad-turma')?.value||'';
+  const tipo=document.getElementById('sel-tipo-inad-turma')?.value||'';
+  let rows=D.inadimplenciaTurma;
+  if(ano) rows=rows.filter(r=>String(r.ano)===ano);
+  if(tipo) rows=rows.filter(r=>r.tipo_debito===tipo);
+
+  // Agrupar por turma (soma tipos)
+  const m={};
+  rows.forEach(r=>{ const k=r.turma+'|'+r.tipo_debito; if(!m[k]) m[k]={turma:r.turma,tipo:r.tipo_debito,alunos:r.qtd_alunos||0,vp:0,vr:0,va:0,qtdI:0,dias:r.dias_atraso_medio||0}; m[k].vp+=r.vl_previsto||0; m[k].vr+=r.vl_recebido||0; m[k].va+=r.vl_em_aberto||0; m[k].qtdI+=r.qtd_inadimp_atual||0; });
+  const sorted=Object.values(m).filter(r=>r.va>0).sort((a,b)=>(b.vp?b.va/b.vp:0)-(a.vp?a.va/a.vp:0));
+  const top20=sorted.slice(0,20);
+
+  mkChart('chart-inad-turma-rank',{type:'bar',data:{labels:top20.map(r=>r.turma),datasets:[{label:'% Inadimplência',data:top20.map(r=>r.vp?Math.round(r.va/r.vp*1000)/10:0),backgroundColor:top20.map(r=>{ const p=r.vp?r.va/r.vp:0; return p>0.2?'#f87171':p>0.1?'#fbbf24':'#34d399'; }),borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6b7290',callback:v=>v+'%'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#e8eaf0',font:{size:11}},grid:{display:false}}}}});
+
+  const tbody=document.getElementById('tbody-inad-turma');
+  tbody.innerHTML=sorted.slice(0,80).map(r=>`<tr><td>${r.turma}</td><td>${r.tipo}</td><td>${r.alunos}</td><td>${brlK(r.vp)}</td><td style="color:var(--red)">${brlK(r.va)}</td><td style="color:${r.vp&&r.va/r.vp>0.15?'var(--red)':r.vp&&r.va/r.vp>0.08?'var(--yellow)':'var(--green)'}">${r.vp?pctFmt(r.va/r.vp):'—'}</td><td>${r.dias}</td></tr>`).join('');
+  renderInsights('inad-turma');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INADIMPLÊNCIA | POR ALUNO
+// ═══════════════════════════════════════════════════════════════════
+function renderInadAlunoSetup(){
+  if(!D?.inadimplenciaAluno) return;
+  const anos=[...new Set(D.inadimplenciaAluno.map(r=>r.ano_recente))].sort();
+  const sel=document.getElementById('sel-ano-inad-aluno');
+  if(sel) sel.innerHTML='<option value="">Todos os anos</option>'+anos.map(a=>`<option>${a}</option>`).join('');
+  renderInadAluno();
+}
+function renderInadAluno(){
+  if(!D?.inadimplenciaAluno) return;
+  const busca=(document.getElementById('search-inad-aluno')?.value||'').toLowerCase();
+  const risco=document.getElementById('sel-risco-inad-aluno')?.value||'';
+  const ano=document.getElementById('sel-ano-inad-aluno')?.value||'';
+  let rows=D.inadimplenciaAluno;
+  if(busca) rows=rows.filter(r=>r.aluno&&r.aluno.toLowerCase().includes(busca));
+  if(risco) rows=rows.filter(r=>r.classificacao_risco===risco);
+  if(ano) rows=rows.filter(r=>String(r.ano_recente)===ano);
+  rows=rows.filter(r=>r.vl_em_aberto>0).sort((a,b)=>(b.vl_em_aberto||0)-(a.vl_em_aberto||0));
+
+  const tbody=document.getElementById('tbody-inad-aluno');
+  tbody.innerHTML=rows.slice(0,200).map(r=>`<tr>
+    <td>${r.aluno||''}</td>
+    <td>${r.turma_recente||''}</td>
+    <td>${r.qtd_parcelas||0}</td>
+    <td>${r.qtd_em_aberto||0}</td>
+    <td style="color:var(--red);font-weight:500">${brl(r.vl_em_aberto)}</td>
+    <td style="color:${r.pct_inadimplencia>0.2?'var(--red)':'var(--yellow)'}">${pctFmt(r.pct_inadimplencia)}</td>
+    <td>${r.dias_atraso_medio||0}</td>
+    <td><span style="color:${riskColor(r.classificacao_risco)};font-size:11px;font-weight:600">${r.classificacao_risco||''}</span></td>
+  </tr>`).join('');
+  renderInsights('inad-aluno');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INADIMPLÊNCIA | CONCENTRAÇÃO (PARETO)
+// ═══════════════════════════════════════════════════════════════════
+function renderInadConcentracao(){
+  if(!D?.inadimplenciaConcentracao) return;
+  const rows=D.inadimplenciaConcentracao;
+  const total=rows.reduce((s,r)=>s+(r.vl_em_aberto||0),0);
+
+  // KPIs: quantos alunos = 80% da dívida
+  let acum=0,n80=0;
+  for(const r of rows){ acum+=(r.vl_em_aberto||0); n80++; if(acum>=total*0.8) break; }
+  const pct80=rows.length?Math.round(n80/rows.length*100):0;
+
+  document.getElementById('kpi-inad-concentracao').innerHTML =
+    kpiCard('Total em Aberto',brlK(total),'mensalidades + kids','var(--red)') +
+    kpiCard('Inadimplentes',rows.length.toLocaleString('pt-BR'),'alunos com saldo','var(--orange)') +
+    kpiCard(`${n80} alunos = 80% da dívida`,`${pct80}% da base`,'curva de Pareto','var(--yellow)') +
+    kpiCard('Maior saldo individual',brlK(rows[0]?.vl_em_aberto||0),rows[0]?.aluno?.split(' ')[0]||'','var(--red)');
+
+  // Gráfico Pareto (top 50)
+  const top50=rows.slice(0,50);
+  mkChart('chart-pareto',{type:'bar',data:{labels:top50.map(r=>r.aluno?.split(' ')[0]||''),datasets:[
+    {type:'bar',label:'Valor em Aberto',data:top50.map(r=>r.vl_em_aberto||0),backgroundColor:'rgba(248,113,113,.7)',borderRadius:3,yAxisID:'y'},
+    {type:'line',label:'% Acumulado',data:top50.map(r=>Math.round((r.pct_acumulado||0)*1000)/10),borderColor:'#fbbf24',pointRadius:2,tension:.3,yAxisID:'y2'}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#e8eaf0'}}},scales:{x:{ticks:{color:'#6b7290',maxRotation:45,font:{size:10}},grid:{display:false}},y:{ticks:{color:'#6b7290',callback:v=>brlK(v)},grid:{color:'rgba(255,255,255,.05)'}},y2:{position:'right',min:0,max:100,ticks:{color:'#fbbf24',callback:v=>v+'%'},grid:{display:false}}}}});
+
+  const tbody=document.getElementById('tbody-inad-conc');
+  tbody.innerHTML=rows.map(r=>`<tr>
+    <td style="color:var(--muted);font-size:11px">${r.ranking}</td>
+    <td>${r.aluno||''}</td><td>${r.turma_recente||''}</td>
+    <td>${r.qtd_em_aberto||0}</td>
+    <td style="color:var(--red);font-weight:500">${brl(r.vl_em_aberto||0)}</td>
+    <td>${r.dias_atraso_max||0}</td>
+    <td>${pctFmt(r.pct_do_total||0)}</td>
+    <td style="color:${(r.pct_acumulado||0)<=0.8?'var(--yellow)':'var(--muted)'}">${pctFmt(r.pct_acumulado||0)}</td>
+  </tr>`).join('');
+  renderInsights('inad-concentracao');
+}
+
+
+
+function initInadSelects() {
+  if (!D) return;
+  const anos16 = [...new Set((D.inadimplenciaMensal||[]).map(r=>r.ano))].sort();
+  const s1 = document.getElementById('sel-ano-inad-mensal');
+  if (s1) s1.innerHTML = '<option value="">Todos os anos</option>' + anos16.map(function(a){ return '<option>'+a+'</option>'; }).join('');
+  const anosTurma = [...new Set((D.inadimplenciaTurma||[]).map(r=>r.ano))].sort();
+  const s2 = document.getElementById('sel-ano-inad-turma');
+  if (s2) s2.innerHTML = '<option value="">Todos os anos</option>' + anosTurma.map(function(a){ return '<option>'+a+'</option>'; }).join('');
+  const anosAluno = [...new Set((D.inadimplenciaAluno||[]).map(r=>r.ano_recente))].sort();
+  const s3 = document.getElementById('sel-ano-inad-aluno');
+  if (s3) s3.innerHTML = '<option value="">Todos os anos</option>' + anosAluno.map(function(a){ return '<option>'+a+'</option>'; }).join('');
+}
+
+</script>
+</body>
+</html>
